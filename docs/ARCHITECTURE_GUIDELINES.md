@@ -23,7 +23,7 @@ app/di ──merangkai semua dependency di atas
 ```
 
 - **Feature UI:** screen, event input, dan tampilan `UiState`. UI tidak mengambil data langsung dari repository.
-- **Presentation bersama:** renderer player dan resep animasi visual yang dipakai match maupun player lab.
+- **Presentation bersama:** renderer player, resep animasi visual, theme tokens, dan komponen visual reusable yang dipakai lebih dari satu screen.
 - **Domain:** model, aturan pertandingan, dan physics yang murni Kotlin. Domain tidak mengenal Compose, Android, Coil, atau Koin.
 - **Data:** implementasi repository, API, storage, mapper. Data bergantung pada interface dan model domain.
 - **App/platform:** entry point, navigation, DI composition root, serta adapter yang hanya tersedia pada platform tertentu.
@@ -89,7 +89,7 @@ Struktur ini menunjukkan pemilik kode. Buat folder saat implementasi dipindahkan
 
 ```text
 shared/src/commonMain/kotlin/com/yogi/foldball/
-├── App.kt
+├── Main.kt                 # Entrypoint aplikasi: Home → Match atau Sandbox
 ├── app/
 │   ├── di/
 │   │   ├── AppModule.kt    # Menggabungkan module yang dimiliki fitur/data
@@ -110,17 +110,23 @@ shared/src/commonMain/kotlin/com/yogi/foldball/
 │   ├── repository/
 │   └── DataModule.kt
 ├── presentation/
+│   ├── theme/
+│   │   ├── ClassroomTheme.kt       # Token warna, material kertas, elevasi, tipografi
+│   │   ├── ClassroomPaperActionButton.kt # Tombol ikon bergaya kertas
+│   │   └── components/             # Komponen theme reusable lintas fitur
 │   └── player/
 │       ├── PaperPlayer.kt   # Body, jersey, nomor, shadow
 │       ├── PlayerMotion.kt  # Resep tilt/squash/recoil
 │       └── PlayerVisual.kt  # Input tampilan yang immutable
 └── feature/
+    ├── home/
+    │   └── HomeScreen.kt   # Tombol masuk Match dan Sandbox
     ├── match/
     │   ├── MatchContract.kt
     │   ├── MatchViewModel.kt
     │   ├── MatchScreen.kt
+    │   ├── components/             # MatchScoreboard, PowerTimingMeter, komposisi HUD match
     │   ├── MatchModule.kt
-    │   └── components/
     └── playerlab/           # Preview animasi saat development
         └── PlayerLabScreen.kt
 
@@ -138,7 +144,21 @@ shared/src/jvmMain/       # Adapter Desktop jika memang diperlukan
 
 `feature/match` dan `feature/playerlab` memakai renderer yang sama dari `presentation/player`. Fitur lain tidak mengimpor implementasi UI dari fitur tetangganya. `core` hanya untuk kode benar-benar umum, bukan tempat menaruh seluruh kode yang belum jelas pemiliknya.
 
-## 6. Penempatan Kode Player
+## 6. Theme Visual Classroom Paper
+
+Match memakai art direction **Classroom Paper** seperti mockup: lapangan kertas hijau di atas meja kayu, dinding karton, scoreboard dari potongan kertas berlapis, dan kontrol kecil yang terlihat seperti ikon tinta pada kertas. Theme adalah sistem visual; ia tidak memiliki state pertandingan atau aturan game.
+
+- Token warna, bentuk kertas, outline, tekstur, elevasi/shadow, dan tipografi bersama berada di `presentation/theme/`. Hindari mengulang nilai warna dan resep surface di setiap screen.
+- Material dasar arena yang digunakan lintas screen berada di `presentation/field/`; komponen yang khusus mengatur skor, timer, tim, buku/menu, kirim, dan pause/play berada di `feature/match/components/` sebagai `MatchScoreboard`.
+- Ikon aksi reusable yang tidak menyimpan state, seperti `ClassroomPaperActionButton`, tinggal di `presentation/theme/`. `MatchScoreboard` dan `PowerTimingMeter` menyusun ikon serta data pertandingan di `feature/match/components/`. Pemilik screen memberikan label aksesibilitas dan callback; komponen visual tidak menentukan navigasi atau aksi pertandingan.
+- Scoreboard mengikuti mockup: strip tim dari kertas berwarna dengan tepi tidak rata, kartu skor putih seperti sobekan, timer gelap di tengah, label babak pada potongan kertas, serta ikon buku dan tombol aksi di ujung strip. Tombol pause berubah menjadi play saat match dijeda.
+- Gunakan bayangan lembut dan sedikit variasi sudut/tepi untuk kesan benda fisik. Jaga kontras angka skor, timer, dan kontrol; tekstur dekoratif tidak boleh mengurangi keterbacaan atau area sentuh.
+- Aset gambar/vector yang dibundel berada di `composeResources/drawable/`; token dan geometri sederhana dapat digambar dengan Compose Canvas agar ukurannya tetap tajam. Sumber desain mentah tetap di folder referensi dan tidak dibaca langsung oleh runtime.
+- Variasi tema di masa depan mengganti token/material melalui konfigurasi theme, bukan menyalin `MatchScreen`, `PaperPlayer`, atau komponen scoreboard.
+
+Perbedaan kepemilikan: `presentation/theme/` menyediakan gaya dasar, `presentation/field/` menggambar arena classroom, dan `feature/match/components/` menyusun data match menjadi scoreboard.
+
+## 7. Penempatan Kode Player
 
 | Tanggung jawab | Lokasi | Contoh |
 | --- | --- | --- |
@@ -154,9 +174,9 @@ shared/src/jvmMain/       # Adapter Desktop jika memang diperlukan
 
 **Use case player:** aksi yang mengubah hasil pertandingan ditempatkan di domain. Kalkulasi kecil berada di `GameEngine`/`PlayerRules`; buat kelas use case tersendiri hanya jika perlu mengorkestrasi beberapa operasi. Animasi visual tidak membutuhkan `AnimatePlayerUseCase` karena tidak mengubah aturan pertandingan.
 
-Renderer `PaperPlayer` dan state animasi kosmetik `PlayerMotionState` berada di `presentation/player/`. Preset serta layar preview pengembangan berada di `feature/playerlab/`. `App.kt` hanya menjadi entry point yang merangkai theme dan screen yang aktif; tambahkan DI dan navigation di sana saat fitur tersebut mulai digunakan.
+Renderer `PaperPlayer` dan state animasi kosmetik `PlayerMotionState` berada di `presentation/player/`. Preset serta layar preview pengembangan berada di `feature/playerlab/`. `Main.kt` menyediakan entrypoint `Main()` yang membuka Home dan `SandboxMain()` yang langsung membuka tool sandbox. Root merangkai screen; pindahkan routing yang membesar ke navigation package saat alur bertambah.
 
-## 7. Koin untuk Dependency Injection
+## 8. Koin untuk Dependency Injection
 
 - Definisi Koin diletakkan dekat pemiliknya: `MatchModule.kt` untuk ViewModel/use case match, `DataModule.kt` untuk implementasi repository, dan module platform untuk adapter native. `app/di/AppModule.kt` hanya menggabungkan module tersebut.
 - `commonMain` merangkai use case, repository interface → implementation, ViewModel, dan service bersama. Domain tidak mengimpor Koin.
@@ -175,7 +195,7 @@ MatchScreen → MatchViewModel → GameEngine
                               MatchRepositoryImpl
 ```
 
-## 8. Coil untuk Gambar Remote
+## 9. Coil untuk Gambar Remote
 
 Gunakan Coil 3 dari UI Compose untuk gambar yang URL-nya berasal dari jaringan.
 
@@ -196,21 +216,23 @@ AsyncImage(
 )
 ```
 
-## 9. Asset Lokal, SVG, dan Animasi Player
+## 10. Asset Lokal, SVG, dan Animasi Player
 
-Compose Multiplatform Resources mengenali gambar raster dan Android XML VectorDrawable. SVG drawable **tidak didukung pada Android** oleh `painterResource`; untuk akses drawable yang sama di semua target, gunakan PNG/WebP atau XML vector dengan fitur yang didukung.
+Compose Multiplatform Resources mendukung gambar raster dan XML vector di `commonMain`. Walaupun API mengenali ekstensi `.svg`, implementasi Android Compose Multiplatform `1.12.1` melempar `IllegalStateException` saat SVG dimuat lewat `painterResource`. Jangan gunakan SVG langsung sebagai drawable runtime lintas platform yang mencakup Android.
 
-Pilihan untuk pack player:
+Aturan aset lokal:
 
-1. Simpan file SVG asli sebagai sumber desain di `paper_soccer_player_assets/`.
-2. Masukkan hanya aset yang benar-benar dibaca runtime ke `shared/src/commonMain/composeResources/`. Jika dipakai sebagai drawable lintas target, konversi path SVG yang kompatibel menjadi XML VectorDrawable, misalnya `drawable/player_body.xml`. Periksa hasilnya karena SVG filter seperti blur tidak otomatis menjadi VectorDrawable.
-3. Untuk shadow, pattern, teks runtime, dan clipping jersey, gambar sebagai layer Compose/Canvas terpisah jika memang perlu recolor atau transform independen.
-4. Bila ingin menampilkan SVG mentah tanpa konversi, `painterResource` bukan jalur Android. Simpan file di `composeResources/files/`, lalu muat dengan Coil 3 + `coil-svg` (misalnya melalui `Res.getUri("files/player.svg")`). Ini cocok untuk gambar utuh yang tidak perlu recolor per layer.
-5. Animasi spring player menggunakan transform procedural pada body; shadow tetap berada di ground layer. Collider dan posisi physics tidak mengikuti squash/tilt kosmetik.
+1. Simpan sumber desain dan referensi di `referensi_assets/`; jangan jadikan seluruh folder referensi sebagai resource runtime.
+2. Simpan hanya aset runtime di `shared/src/commonMain/composeResources/drawable/`. Gunakan nama resource sederhana dengan huruf kecil dan underscore, lalu akses melalui `Res.drawable.<nama>` dan `painterResource`.
+3. Untuk ikon dan ilustrasi berbasis path, konversi SVG sumber menjadi XML vector yang didukung Compose Resources; pertahankan SVG asli di folder referensi. Periksa hasil konversi karena filter, mask, gradient kompleks, font eksternal, atau fitur browser-only mungkin tidak terbawa.
+4. Gunakan PNG/WebP untuk tekstur raster, lukisan kompleks, dan efek bertekstur. Jangan masukkan SVG langsung ke drawable bersama Android kecuali renderer dan target pemakaiannya memang sudah dipastikan mendukungnya.
+5. Coil `coil-svg` hanya diperlukan bila SVG memang dimuat melalui pipeline Coil, misalnya gambar remote. Untuk aset lokal runtime lintas target, gunakan resource XML vector atau raster Compose Resources.
+6. Untuk shadow, pattern, teks runtime, dan clipping jersey, gambar sebagai layer Compose/Canvas terpisah bila perlu recolor atau transform independen.
+7. Animasi spring player menggunakan transform procedural pada body; shadow tetap berada di ground layer. Collider dan posisi physics tidak mengikuti squash/tilt kosmetik.
 
-Pack SVG sekarang tetap menjadi sumber desain modular. Renderer Canvas yang saat ini mengikuti path aset dapat diteruskan untuk animasi procedural; konversi XML diperlukan hanya jika renderer memilih memakai `painterResource` untuk layer vector. Shadow dipisah dari body agar tidak ikut squash/tilt. `Paper Soccer Player Asset Sheet.png` adalah referensi pose, bukan sprite final.
+Untuk animasi player yang perlu mengubah bagian tubuh secara independen, gunakan path/layer modular atau renderer Canvas; satu SVG statis tidak otomatis menyediakan pose yang dapat dianimasikan per bagian. Shadow dipisah dari body agar tidak ikut squash/tilt. `Paper Soccer Player Asset Sheet.png` adalah referensi pose, bukan sprite final.
 
-## 10. Aturan Dependency dan Pertumbuhan Proyek
+## 11. Aturan Dependency dan Pertumbuhan Proyek
 
 - Tambahkan dependency hanya di source set yang memakainya.
 - Simpan versi dan alias di `gradle/libs.versions.toml`; gunakan BOM jika library menyediakannya dan proyek memilih BOM.
@@ -219,7 +241,7 @@ Pack SVG sekarang tetap menjadi sumber desain modular. Renderer Canvas yang saat
 - Pecah satu `shared` menjadi Gradle module terpisah ketika ada batas dependency yang nyata, kebutuhan reuse di produk lain, atau waktu build yang terbukti menjadi hambatan. Package boundary cukup untuk tahap sekarang.
 - Satu perubahan fitur mengikuti urutan: model/aturan domain → data jika perlu → ViewModel/MVI → screen → DI registration. Renderer player reusable dipakai oleh screen, tanpa screen lain menjadi dependency.
 
-## 11. Rujukan Resmi
+## 12. Rujukan Resmi
 
 - [Compose Multiplatform resources: format image dan dukungan SVG](https://kotlinlang.org/docs/multiplatform/compose-multiplatform-resources-usage.html#images)
 - [Koin setup](https://insert-koin.io/docs/setup/)

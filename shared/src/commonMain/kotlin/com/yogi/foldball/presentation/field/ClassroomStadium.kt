@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,8 +33,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import foldball.shared.generated.resources.Res
-import foldball.shared.generated.resources.desk_wood
 import foldball.shared.generated.resources.field_green_paper
+import foldball.shared.generated.resources.home_desk_classroom
 import foldball.shared.generated.resources.wall_cardboard_tile
 import org.jetbrains.compose.resources.painterResource
 
@@ -49,7 +50,7 @@ fun ClassroomStadium(
     modifier: Modifier = Modifier,
     fieldWidthDp: Float = 393f,
     fieldHeightDp: Float = 470f,
-    content: @Composable () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
         modifier = modifier
@@ -60,8 +61,8 @@ fun ClassroomStadium(
     ) {
         // Layer 1: Desk Wood Background
         Image(
-            painter = painterResource(Res.drawable.desk_wood),
-            contentDescription = "Wooden Desk",
+            painter = painterResource(Res.drawable.home_desk_classroom),
+            contentDescription = "Classroom desk",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )

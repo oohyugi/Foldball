@@ -267,7 +267,7 @@ Setiap player memiliki status interaksi yang mengikuti fase permainan:
 | Status | Peran | Gerakan yang diizinkan | Tampilan |
 | --- | --- | --- | --- |
 | **Inactive** | Player selain penendang yang sedang fokus | Dapat di-drag pada Formation Phase, dibatasi movement radius | Pose netral, tanpa highlight fokus |
-| **Active / Focused** | Penendang yang dipilih otomatis karena paling dekat dengan bola | Bergerak otomatis ke belakang bola; posisi gameplay terkunci. Drag horizontal pada bidak mengatur aim, tarik ke bawah mengisi power | Highlight fokus dan animasi fokus ringan |
+| **Active / Focused** | Penendang yang dipilih otomatis karena paling dekat dengan bola | Bergerak otomatis ke belakang bola; posisi gameplay terkunci. Drag horizontal mengatur aim; meter power bergerak otomatis selama drag | Highlight fokus dan animasi fokus ringan |
 
 Status Active/Focused dimulai ketika nearest player dipilih dan berakhir setelah tendangan serta physics selesai. Setelah bola berhenti, nearest player berikutnya menjadi fokus. Status menentukan interaksi yang tersedia; animasi visual tidak mengubah posisi physics atau collider.
 
@@ -275,7 +275,7 @@ Status Active/Focused dimulai ketika nearest player dipilih dan berakhir setelah
 
 Sebelum tendangan, user dapat mengatur pemain **Inactive**.
 
-Player **Active/Focused** tidak dapat direposition oleh user. Sistem menempatkannya otomatis di belakang bola. Gesture pull-back mengisi power charge dan mendeformasi bidak secara bertahap. Posisi gameplay dan collider tetap di tempat. Saat release, bidak snap ke depan dan sedikit overshoot lalu settle; bola mulai bergerak tepat ketika snap dimulai.
+Player **Active/Focused** tidak dapat direposition oleh user. Sistem menempatkannya otomatis di belakang bola. Saat user mulai drag untuk membidik, meter power mulai bergerak bolak-balik. Posisi gameplay dan collider tetap di tempat. Saat release, nilai meter saat itu menentukan power; bidak snap ke depan dan sedikit overshoot lalu settle, sementara bola mulai bergerak tepat ketika snap dimulai.
 
 Pemain Inactive dapat di-drag selama Formation Phase.
 
@@ -323,7 +323,7 @@ Nilai final ditentukan melalui playtesting.
 
 Setelah formation phase, player aktif/fokus masuk ke **Aiming Mode** dan tetap berada di belakang bola.
 
-User menentukan arah tendangan dengan menggeser penendang aktif ke kiri atau kanan. Gesture horizontal mengubah sudut aim secara langsung tanpa menggeser posisi gameplay penendang. Gesture tarik ke bawah tetap digunakan untuk mengisi power dan melepas tendangan.
+Aim guide tidak tampil terus saat giliran dimulai. Guide muncul saat user mulai menggeser penendang aktif. Drag horizontal mengubah sudut aim; selama gesture berjalan, meter power bergerak otomatis bolak-balik. Gerakan vertikal tidak mengubah aim maupun power, dan posisi gameplay penendang tetap.
 
 **Drag horizontal pada penendang aktif menentukan arah awal tendangan.** Bidak tetap terkunci di posisi gameplay. Badannya boleh miring sedikit ke arah bidikan sebagai feedback visual, tetapi kemiringan ini tidak menentukan arah tendangan dan badan tidak diputar mengikuti sudut bidik secara penuh.
 
@@ -337,13 +337,13 @@ User menentukan arah tendangan dengan menggeser penendang aktif ke kiri atau kan
    aim kiri    aim kanan
 ```
 
-Menggeser penendang aktif ke kiri atau kanan mengubah sudut tendangan. Arah umum tetap menuju sisi lapangan lawan. Lepas gesture horizontal untuk menyimpan aim; tarik ke bawah untuk charge dan release menendang.
+Menggeser penendang aktif ke kiri atau kanan mengubah sudut tendangan. Arah umum tetap menuju sisi lapangan lawan. Selama drag, user dapat mengoreksi aim sambil melihat guide dan meter power. Lepas gesture untuk menendang dengan nilai power yang sedang ditunjuk meter.
 
 Guide line mengikuti sudut aim dan menunjukkan arah awal bola. Pose aim kiri/kanan pada aset diterapkan sebagai kemiringan visual ringan saja.
 
 ## 16. Aim Guide
 
-Saat penendang aktif digeser ke kiri atau kanan, sistem menampilkan **guide line**.
+Saat user mulai menggeser penendang aktif, sistem menampilkan **guide line**. Guide mengikuti aim yang tersimpan selama fase persiapan dan hilang setelah tendangan dimulai.
 
 Guide line menunjukkan arah awal bola.
 
@@ -393,9 +393,7 @@ Full trajectory prediction tidak termasuk MVP.
 
 ## 18. Shot Power
 
-Setelah arah ditentukan, user menentukan power dengan:
-
-**menarik penendang ke belakang untuk mengisi power.** Tarikan menjadi input charge; bidak memberi feedback lewat deformasi visual tanpa berpindah dari posisi gameplay.
+Power ditentukan dengan timing. Saat user mulai drag penendang aktif, penunjuk pada meter power bergerak bolak-balik dari rendah ke tinggi dan kembali. User mengatur aim dengan gerakan horizontal; gerakan vertikal tidak memengaruhi aim atau power. Release mengunci nilai power yang sedang ditunjuk meter dan langsung menendang.
 
 ```text
        arah bola
@@ -403,15 +401,10 @@ Setelah arah ditentukan, user menentukan power dengan:
           │
          ⚽
          ●
-         ↓
-      pull back
+    meter power ↔
 ```
 
-Semakin jauh ditarik:
-
-**semakin besar power.**
-
-Tarikan dilakukan menjauhi bola sepanjang arah tendangan yang sedang dituju. Gerakan ini menentukan power; posisi bidik pada arc tetap menjadi acuan arah tendangan.
+User memilih momen release untuk menentukan kekuatan tendangan. Meter berhenti saat release; indikator dan angka power menunjukkan nilai yang dipakai.
 
 ---
 
@@ -430,31 +423,25 @@ Formation phase
 ↓
 Atur posisi player inactive
 ↓
-Penendang aktif digeser kiri / kanan
+Drag horizontal penendang aktif untuk aim
 ↓
-Guide line berubah
+Guide line mengikuti aim; meter power bergerak bolak-balik
 ↓
-Tarik penendang ke belakang
-↓
-Power bertambah
-↓
-Release
+Release saat meter menunjukkan power yang diinginkan
 ↓
 Tendangan dilakukan
 ```
 
+Selama drag aktif, gerakan horizontal hanya mengatur aim dan meter power bergerak otomatis. Gerakan vertikal diabaikan. Release mengakhiri gesture, mengambil nilai power saat itu, lalu menendang.
+
 Gesture utama:
 
-### Aim
+### Aim dan timing power
 
 ```text
-drag focused kicker left/right
-```
-
-### Power
-
-```text
-drag active kicker backward to charge
+drag focused kicker left/right → aim
+power indicator sweeps low ↔ high automatically
+release → shoot at the current power
 ```
 
 ### Shoot
@@ -467,7 +454,7 @@ release
 
 ## 20. Power Indicator
 
-Saat penendang ditarik ke belakang, ditampilkan indikator power.
+Saat drag aim aktif, indikator power tampil sebagai overlay vertikal di sisi kanan lapangan, mengikuti referensi visual: bingkai hitam bertepi putih, tujuh blok warna merah di atas hingga hijau di bawah, panah putih di sisi kanan yang menunjuk ke blok aktif, dan label kertas `POWER` di bawah. Penunjuk bergerak naik-turun; merah menandakan power tinggi dan hijau power rendah. Overlay hanya tampil selama gesture aktif, lalu menghilang setelah release atau gesture dibatalkan. Nilai indikator saat release menentukan kekuatan tendangan.
 
 Power dapat menggunakan 3 level visual:
 
@@ -489,7 +476,7 @@ Untuk anak kecil, indikator tidak perlu menggunakan angka.
 
 ## 21. Shot Feedback
 
-Saat user release:
+Saat user melepas gesture aim:
 
 - penendang melakukan animasi kick/spring dengan recoil singkat berlawanan arah tendangan;
 - bola mendapat velocity;
@@ -558,11 +545,11 @@ Animasi player MVP:
 - **Active / focus:** player aktif memiliki highlight di ground dan pulse/spring halus saat fokus berpindah kepadanya. Player nonaktif tidak memakai highlight atau pulse fokus.
 - **Auto-move kicker:** player terpilih bergerak ke posisi tetap di belakang bola, lalu settle. Gunakan gerak translasi, bukan pose berjalan.
 - **Aim:** player fokus tetap di belakang bola. Drag horizontal menentukan arah; badan miring sedikit mengikuti arah bidik sebagai feedback tanpa bergeser dari posisi gameplay atau diputar penuh.
-- **Power / pressed:** saat drag dimulai, bidak aktif sedikit compress ke bawah. Makin jauh tarikan, scaleY turun bertahap, scaleX bertambah tipis, tilt mengikuti arah aim secara terbatas, dan bend/skew terasa halus. Deformasi memperjelas charge `0..1` bersama power meter tanpa mengubah posisi gameplay/collider.
-- **Kick / release:** saat release, bidak snap ke depan dengan overshoot kecil lalu settle. Bola mulai bergerak tepat pada awal fase snap; kekuatan charge menentukan tenaga dan jarak tendangan, sementara animasi visual tidak menunda physics.
+- **Power timing:** saat aim gesture aktif, deformasi bidak mengikuti nilai meter yang bergerak bolak-balik. Posisi gameplay dan collider tidak berubah.
+- **Kick / release:** saat release, bidak snap ke depan dengan overshoot kecil lalu settle. Bola mulai bergerak tepat pada awal fase snap; nilai meter saat release menentukan tenaga dan jarak tendangan, sementara animasi visual tidak menunda physics.
 - **Collision:** player menerima dorongan visual kecil, miring sesaat, lalu spring kembali ke posisi fisiknya.
 
-Animasi focus, aim, power, dan kick harus mempertahankan perbedaan yang jelas antara status fokus, arah bidik, charge, dan gerak kick saat release. Terapkan transform badan dengan pivot di bagian bawah pemain. Scale, bend, squash, stretch, tilt, dan offset visual saat snap tidak mengubah posisi physics atau collider.
+Animasi focus, aim, power timing, dan kick harus mempertahankan perbedaan yang jelas antara status fokus, arah bidik, nilai meter, dan gerak kick saat release. Terapkan transform badan dengan pivot di bagian bawah pemain. Scale, bend, squash, stretch, tilt, dan offset visual saat snap tidak mengubah posisi physics atau collider.
 
 ---
 
@@ -886,16 +873,13 @@ touch player
 → release
 ```
 
-### Aim
+### Aim dan power
 
 ```text
 drag focused kicker left/right
-```
-
-### Power
-
-```text
-drag active kicker backward to charge
+guide appears and follows the aim
+power meter sweeps low ↔ high during the drag
+release to shoot at the indicated power
 ```
 
 ### Shoot
@@ -1082,7 +1066,7 @@ Target:
 - inactive player reposition pada formation phase
 - drag horizontal pada kicker aktif untuk arah tendangan
 - aim guide
-- pull-back power mechanic
+- timing power meter yang bergerak bolak-balik selama gesture aim aktif
 - shooting
 - procedural paper-player spring animation
 - physics-driven ball animation
@@ -1319,18 +1303,15 @@ shotDirection =
     directionFromAimAngle(kickerAimAngle, attackingDirection)
 ```
 
-The focused kicker stays behind the ball. A horizontal drag changes `kickerAimAngle` and shot direction without changing gameplay position. Player tilt is a small visual response and does not rotate through the full angle.
+The focused kicker stays behind the ball. Show the guide after the user begins dragging the focused kicker. Horizontal drag changes `kickerAimAngle`; vertical movement is ignored. While this drag is active, the power indicator sweeps repeatedly between low and high. Release uses the current power value and starts the shot; neither gesture changes gameplay position. Player tilt is a small visual response and does not rotate through the full angle.
 
 Shot power:
 
 ```text
-shotPower =
-    clamp(
-        pullDistance / maxPullDistance,
-        0f,
-        1f
-    )
+shotPower = currentPowerMeterValue
 ```
+
+The power meter oscillates between `0f` and `1f` while the focused kicker is being dragged. It freezes on release and that value is used for the shot.
 
 ---
 
@@ -1340,7 +1321,7 @@ shotPower =
 
 Pemain hanya perlu memahami:
 
-> “Atur posisi pemain → bidik → tarik untuk power → lepas → gol.”
+> “Atur posisi pemain → geser untuk membidik → lepas saat power pas → gol.”
 
 Pemain yang lebih lama bermain mulai memahami:
 

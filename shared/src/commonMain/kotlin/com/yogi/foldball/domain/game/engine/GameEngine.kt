@@ -100,6 +100,7 @@ class GameEngine(private val width: Float, private val height: Float) {
     private val movementRadius = 100f
     private val wallInset = 18f
     private val redAttack = -1f
+    private val referenceFieldHeight = 580f
 
     private var players = listOf(
         player("red-left", GameTeam.RED, .27f, .76f),
@@ -158,7 +159,9 @@ class GameEngine(private val width: Float, private val height: Float) {
         val player = players.first { it.id == focusedPlayerId }
         val forward = if (player.team == GameTeam.RED) redAttack else -redAttack
         val direction = Vector2(sin(aimAngle) * -forward, cos(aimAngle) * forward)
-        val speed = 150f + power * 520f
+        // Keep a full-power shot proportionate as the playable field grows on Match screens.
+        val fieldScale = (height / referenceFieldHeight).coerceIn(1f, 1.25f)
+        val speed = 150f + power * 520f * fieldScale
         ball = ball.copy(
             velocity = direction * speed,
             verticalVelocity = 120f + power * 280f,
