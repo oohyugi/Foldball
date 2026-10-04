@@ -33,6 +33,8 @@ fun MatchScoreboard(
     onMenuClick: () -> Unit,
     onShareClick: () -> Unit,
     onPauseClick: () -> Unit,
+    blueScore: Int = 0,
+    redScore: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val minutes = elapsedSeconds / 60
@@ -70,7 +72,7 @@ fun MatchScoreboard(
                 maxLines = 1,
             )
             ScoreCard(
-                score = "0",
+                score = blueScore.toString(),
                 ink = Color(0xFF24314A),
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -107,7 +109,7 @@ fun MatchScoreboard(
                 maxLines = 1,
             )
             ScoreCard(
-                score = "0",
+                score = redScore.toString(),
                 ink = Color(0xFFBD3031),
                 modifier = Modifier
                     .align(Alignment.CenterStart)

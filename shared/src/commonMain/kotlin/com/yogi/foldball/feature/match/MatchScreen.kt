@@ -1,6 +1,8 @@
 package com.yogi.foldball.feature.match
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Canvas
@@ -37,6 +39,7 @@ import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.Vector2
 import com.yogi.foldball.feature.match.components.PowerTimingMeter
 import com.yogi.foldball.feature.match.components.MatchScoreboard
+import com.yogi.foldball.feature.match.components.GoalCelebrationOverlay
 import com.yogi.foldball.presentation.ball.PaperBall
 import com.yogi.foldball.presentation.field.ClassroomStadium
 import com.yogi.foldball.presentation.player.PaperPlayer
@@ -72,11 +75,15 @@ private fun MatchExperienceScreen(
     val scope = rememberCoroutineScope()
     val playerMotion = rememberPlayerMotionState()
     var isPaused by remember { mutableStateOf(false) }
+    var isMatchFinished by remember { mutableStateOf(false) }
+    var matchKey by remember { mutableIntStateOf(0) }
+    var redScore by remember { mutableIntStateOf(0) }
+    var blueScore by remember { mutableIntStateOf(0) }
     var matchElapsedSeconds by remember { mutableIntStateOf(0) }
     var showMatchMenu by remember { mutableStateOf(false) }
     var showShareSummary by remember { mutableStateOf(false) }
-    LaunchedEffect(fullMatch, isPaused) {
-        if (fullMatch) {
+    LaunchedEffect(fullMatch, isPaused, isMatchFinished) {
+        if (fullMatch && !isMatchFinished) {
             while (true) {
                 delay(1_000)
                 if (!isPaused) matchElapsedSeconds += 1
@@ -101,6 +108,8 @@ private fun MatchExperienceScreen(
                 onMenuClick = { showMatchMenu = true },
                 onShareClick = { showShareSummary = true },
                 onPauseClick = { isPaused = !isPaused },
+                blueScore = blueScore,
+                redScore = redScore,
             )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -134,11 +143,33 @@ private fun MatchExperienceScreen(
             } else {
                 470f
             }
-            val engine = remember(fieldWidth, fieldHeight) { GameEngine(fieldWidth, fieldHeight) }
+            val engine = remember(fieldWidth, fieldHeight, matchKey) {
+                GameEngine(fieldWidth, fieldHeight, targetScore = if (fullMatch) 3 else null)
+            }
             var state by remember(engine) { mutableStateOf(engine.snapshot) }
+            val goalShake = remember(engine) { Animatable(0f) }
             var kickingPlayerId by remember(engine) { mutableStateOf<String?>(null) }
             var showAimGuide by remember(engine) { mutableStateOf(false) }
             var isPowerTiming by remember(engine) { mutableStateOf(false) }
+            LaunchedEffect(engine, state.phase, state.lastScoringTeam) {
+                if (state.phase == GamePhase.GOAL) {
+                    goalShake.snapTo(0f)
+                    goalShake.animateTo(
+                        targetValue = 0f,
+                        animationSpec = keyframes {
+                            durationMillis = 520
+                            .95f at 45
+                            -.72f at 110
+                            .54f at 185
+                            -.34f at 270
+                            .16f at 365
+                            0f at 500
+                        },
+                    )
+                } else {
+                    goalShake.snapTo(0f)
+                }
+            }
             fun refresh() {
                 state = engine.snapshot
             }
@@ -165,8 +196,13 @@ private fun MatchExperienceScreen(
                 while (true) {
                     withFrameNanos { now ->
                         if (!isPaused && previous != 0L && engine.snapshot.phase != GamePhase.AIMING) {
-                            state =
-                                engine.step(((now - previous) / 1_000_000_000f).coerceAtMost(1f / 30f))
+                            val nextState = engine.step(
+                                ((now - previous) / 1_000_000_000f).coerceAtMost(1f / 30f)
+                            )
+                            state = nextState
+                            redScore = nextState.redScore
+                            blueScore = nextState.blueScore
+                            if (nextState.winner != null) isMatchFinished = true
                         }
                         previous = now
                     }
@@ -206,6 +242,9 @@ private fun MatchExperienceScreen(
                 ClassroomStadium(
                     fieldWidthDp = fieldWidth,
                     fieldHeightDp = fieldHeight,
+                    goalShakeOffset = goalShake.value,
+                    shakeTopGoal = state.phase == GamePhase.GOAL && state.lastScoringTeam == GameTeam.RED,
+                    shakeBottomGoal = state.phase == GamePhase.GOAL && state.lastScoringTeam == GameTeam.BLUE,
                 ) {
                     Canvas(Modifier.fillMaxSize()) {
                         val h = size.height
@@ -325,8 +364,8 @@ private fun MatchExperienceScreen(
                     val ballSpeed = (state.ball.velocity.length() / 670f).coerceIn(0f, 1f)
                     val ballLift = (state.ball.height / 36f).coerceIn(0f, 1f)
                     val groundContact = (1f - state.ball.height / 5f).coerceIn(0f, 1f)
-                    val shadowWidth = 30.dp + 18.dp * ballLift
-                    val shadowHeight = 9.dp + 8.dp * ballLift
+                    val shadowWidth = 21.dp + 12.dp * ballLift
+                    val shadowHeight = 6.dp + 5.dp * ballLift
                     Canvas(
                         Modifier.offset(
                             state.ball.position.x.dp + 7.dp * ballLift - shadowWidth / 2,
@@ -344,8 +383,8 @@ private fun MatchExperienceScreen(
                             ),
                         )
                         if (groundContact > .01f) {
-                            val contactWidth = 20.dp.toPx()
-                            val contactHeight = 4.dp.toPx()
+                            val contactWidth = 14.dp.toPx()
+                            val contactHeight = 2.5.dp.toPx()
                             drawOval(
                                 color = Color(0xFF51483D).copy(alpha = .26f * groundContact),
                                 topLeft = Offset(
@@ -427,6 +466,35 @@ private fun MatchExperienceScreen(
                             }
                         }
 
+                        val postImpact = state.ball.goalPostImpactStrength.coerceIn(0f, 1f)
+                        if (postImpact > .025f) {
+                            val center = Offset(
+                                state.ball.position.x * density + state.ball.impactSideX * 7.dp.toPx(),
+                                state.ball.position.y * density + state.ball.impactSideY * 7.dp.toPx(),
+                            )
+                            val expansion = (1f - postImpact) * 7.dp.toPx()
+                            drawCircle(
+                                color = Color(0xFFD6A568).copy(alpha = postImpact * .8f),
+                                radius = 2.5.dp.toPx() + expansion,
+                                center = center,
+                                style = Stroke(width = (1f + postImpact).dp.toPx()),
+                            )
+                            repeat(5) { index ->
+                                val angle = index * (2f * PI.toFloat() / 5f) +
+                                    if (state.ball.impactSideX < 0f) PI.toFloat() else 0f
+                                val direction = Offset(cos(angle), sin(angle))
+                                val start = center + direction * (2.dp.toPx() + expansion)
+                                val end = start + direction * (2.dp.toPx() + postImpact * 3.dp.toPx())
+                                drawLine(
+                                    color = Color(0xFFE8C38F).copy(alpha = postImpact * .9f),
+                                    start = start,
+                                    end = end,
+                                    strokeWidth = 1.dp.toPx(),
+                                    cap = StrokeCap.Round,
+                                )
+                            }
+                        }
+
                         val landing = state.ball.landingStrength.coerceIn(0f, 1f)
                         if (landing > .025f) {
                             val ground = Offset(
@@ -455,14 +523,14 @@ private fun MatchExperienceScreen(
                             }
                         }
                     }
-                    val ballStretch = (state.ball.velocity.length() / 700f).coerceIn(0f, .12f)
-                    val airborneScale = ballLift * .14f
-                    val ballVisualSize = 22.dp
+                    val ballStretch = (state.ball.velocity.length() / 700f).coerceIn(0f, .08f)
+                    val airborneScale = ballLift * .08f
+                    val ballVisualSize = 16.dp
                     PaperBall(
                         rotationX = state.ball.rotationX,
                         rotationY = state.ball.rotationY,
-                        scaleX = 1f + ballStretch + airborneScale + .025f * groundContact,
-                        scaleY = 1f - ballStretch * .55f - ballLift * .08f - .055f * groundContact,
+                        scaleX = 1f + ballStretch + airborneScale + .015f * groundContact,
+                        scaleY = 1f - ballStretch * .4f - ballLift * .05f - .035f * groundContact,
                         impactSideX = state.ball.impactSideX,
                         impactSideY = state.ball.impactSideY,
                         impactStrength = state.ball.impactStrength,
@@ -480,6 +548,10 @@ private fun MatchExperienceScreen(
                             )
                         }
                     }
+                    GoalCelebrationOverlay(
+                        visible = state.phase == GamePhase.GOAL,
+                        scoringTeam = state.lastScoringTeam,
+                    )
                 }
 
                 val active = state.players.first { it.id == state.focusedPlayerId }
@@ -498,6 +570,8 @@ private fun MatchExperienceScreen(
                                 GamePhase.BALL_MOVING -> "BOLA BERGERAK"
                                 GamePhase.KICKER_APPROACH -> "KICKER MENUJU BOLA"
                                 GamePhase.AIMING -> if (fullMatch) "GILIRAN ${active.team.name} · ${aimDegrees}°" else "GILIRAN ${active.team.name} · ${aimDegrees}° AIM"
+                                GamePhase.GOAL -> "GOL TIM ${state.lastScoringTeam?.name}"
+                                GamePhase.MATCH_OVER -> "PERTANDINGAN SELESAI"
                             },
                             color = Color(0xFF24314A),
                             fontSize = 11.sp,
@@ -511,6 +585,7 @@ private fun MatchExperienceScreen(
                             Text(
                                 when {
                                     isPaused -> "PERTANDINGAN DIJEDA"
+                                    state.phase == GamePhase.GOAL -> "Kickoff berikutnya sebentar lagi"
                                     state.phase == GamePhase.AIMING -> "Geser kiri/kanan · lepas saat power pas"
                                     else -> "Tunggu bola berhenti"
                                 },
@@ -560,7 +635,7 @@ private fun MatchExperienceScreen(
                     title = { Text("RINGKASAN MATCH") },
                     text = {
                         Text(
-                            "BIRU 0 – 0 MERAH\n${matchElapsedSeconds / 60}:${
+                            "BIRU $blueScore – $redScore MERAH\n${matchElapsedSeconds / 60}:${
                                 (matchElapsedSeconds % 60).toString().padStart(2, '0')
                             } · FIRST TO 3"
                         )
@@ -569,6 +644,32 @@ private fun MatchExperienceScreen(
                         TextButton(onClick = {
                             showShareSummary = false
                         }) { Text("Tutup") }
+                    },
+                )
+            }
+            if (fullMatch && state.phase == GamePhase.MATCH_OVER) {
+                val winningTeam = state.winner
+                AlertDialog(
+                    onDismissRequest = {},
+                    title = { Text("PERTANDINGAN SELESAI") },
+                    text = {
+                        Text(
+                            "TIM ${winningTeam?.name} MENANG\nBIRU ${state.blueScore} – ${state.redScore} MERAH"
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            matchKey += 1
+                            isMatchFinished = false
+                            isPaused = false
+                            matchElapsedSeconds = 0
+                            redScore = 0
+                            blueScore = 0
+                            showShareSummary = false
+                        }) { Text("Main lagi") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { onOpenTools("home") }) { Text("Beranda") }
                     },
                 )
             }

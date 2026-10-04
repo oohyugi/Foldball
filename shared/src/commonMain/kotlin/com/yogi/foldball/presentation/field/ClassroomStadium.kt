@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -50,6 +51,9 @@ fun ClassroomStadium(
     modifier: Modifier = Modifier,
     fieldWidthDp: Float = 393f,
     fieldHeightDp: Float = 470f,
+    goalShakeOffset: Float = 0f,
+    shakeTopGoal: Boolean = false,
+    shakeBottomGoal: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
@@ -110,13 +114,23 @@ fun ClassroomStadium(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 10.dp)
-                    .size(160.dp, 36.dp),
+                    .size(160.dp, 36.dp)
+                    .graphicsLayer {
+                        val shake = if (shakeTopGoal) goalShakeOffset else 0f
+                        translationX = shake * 4.dp.toPx()
+                        rotationZ = shake * 1.1f
+                    },
             )
             ClassroomGoalBottom(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 10.dp)
-                    .size(160.dp, 36.dp),
+                    .size(160.dp, 36.dp)
+                    .graphicsLayer {
+                        val shake = if (shakeBottomGoal) goalShakeOffset else 0f
+                        translationX = shake * 4.dp.toPx()
+                        rotationZ = shake * 1.1f
+                    },
             )
 
             // Layer 6: Match Entities & Interactive Content (Players, Ball, VFX)

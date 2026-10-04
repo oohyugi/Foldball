@@ -16,7 +16,7 @@ data class Vector2(val x: Float, val y: Float) {
 }
 
 enum class GameTeam { RED, BLUE }
-enum class GamePhase { AIMING, BALL_MOVING, KICKER_APPROACH }
+enum class GamePhase { AIMING, BALL_MOVING, KICKER_APPROACH, GOAL, MATCH_OVER }
 
 data class MatchPlayer(
     val id: String,
@@ -41,6 +41,7 @@ data class MatchBall(
     val impactSideY: Float = 0f,
     val impactStrength: Float = 0f,
     val landingStrength: Float = 0f,
+    val goalPostImpactStrength: Float = 0f,
 )
 
 data class GameSnapshot(
@@ -50,6 +51,11 @@ data class GameSnapshot(
     val focusedPlayerId: String,
     val aimAngle: Float,
     val power: Float,
+    val redScore: Int,
+    val blueScore: Int,
+    val lastScoringTeam: GameTeam?,
+    val kickoffTeam: GameTeam,
+    val winner: GameTeam?,
 )
 
 private data class PlayerCollision(
@@ -67,8 +73,14 @@ private data class BallMotion(
     val verticalVelocity: Float,
 )
 
+private data class GoalLineCrossing(val team: GameTeam, val lineY: Float, val x: Float)
+
 /** Deterministic, platform-independent movement and ball physics for the match feature. */
-class GameEngine(private val width: Float, private val height: Float) {
+class GameEngine(
+    private val width: Float,
+    private val height: Float,
+    private val targetScore: Int? = 3,
+) {
     private val ballRadius = 10f
     private val playerRadius = 25f
     private val playerCollisionOffsetY = -43f
@@ -101,6 +113,7 @@ class GameEngine(private val width: Float, private val height: Float) {
     private val wallInset = 18f
     private val redAttack = -1f
     private val referenceFieldHeight = 580f
+    private val goalCelebrationDuration = 2.2f
 
     private var players = listOf(
         player("red-left", GameTeam.RED, .27f, .76f),
@@ -115,6 +128,12 @@ class GameEngine(private val width: Float, private val height: Float) {
     private var focusedPlayerId = "red-center"
     private var aimAngle = 0f
     private var power = 0f
+    private var redScore = 0
+    private var blueScore = 0
+    private var lastScoringTeam: GameTeam? = null
+    private var kickoffTeam = GameTeam.RED
+    private var winner: GameTeam? = null
+    private var goalCelebrationElapsed = 0f
     private var approachFrom: Vector2? = null
     private var approachTo: Vector2? = null
     private var approachBallFrom: Vector2? = null
@@ -127,7 +146,20 @@ class GameEngine(private val width: Float, private val height: Float) {
         moveFocusedBehindBall()
     }
 
-    val snapshot: GameSnapshot get() = GameSnapshot(players.toList(), ball, phase, focusedPlayerId, aimAngle, power)
+    val snapshot: GameSnapshot
+        get() = GameSnapshot(
+            players = players.toList(),
+            ball = ball,
+            phase = phase,
+            focusedPlayerId = focusedPlayerId,
+            aimAngle = aimAngle,
+            power = power,
+            redScore = redScore,
+            blueScore = blueScore,
+            lastScoringTeam = lastScoringTeam,
+            kickoffTeam = kickoffTeam,
+            winner = winner,
+        )
 
     fun moveInactivePlayer(id: String, delta: Vector2) {
         if (phase != GamePhase.AIMING || id == focusedPlayerId) return
@@ -154,20 +186,24 @@ class GameEngine(private val width: Float, private val height: Float) {
 
     fun shoot(): Boolean {
         if (phase != GamePhase.AIMING || power <= .01f) return false
-        lastContactPlayerId = null
-        contactCooldownRemaining = 0f
         val player = players.first { it.id == focusedPlayerId }
+        // The ball starts only 1 dp outside the kicker's collision radius. Ignore
+        // that player briefly so the launch cannot immediately rebound backward.
+        lastContactPlayerId = player.id
+        contactCooldownRemaining = playerContactCooldown
         val forward = if (player.team == GameTeam.RED) redAttack else -redAttack
         val direction = Vector2(sin(aimAngle) * -forward, cos(aimAngle) * forward)
-        // Keep a full-power shot proportionate as the playable field grows on Match screens.
+        // Tune a full-power shot to travel roughly goal-to-goal despite paper-ball drag.
         val fieldScale = (height / referenceFieldHeight).coerceIn(1f, 1.25f)
-        val speed = 150f + power * 520f * fieldScale
+        val appliedPower = power * power * power
+        val speed = 150f + appliedPower * 3_350f * fieldScale
         ball = ball.copy(
             velocity = direction * speed,
-            verticalVelocity = 120f + power * 280f,
+            verticalVelocity = 120f + appliedPower * 280f,
             impactSideX = 0f,
             impactSideY = 0f,
             impactStrength = 0f,
+            goalPostImpactStrength = 0f,
         )
         phase = GamePhase.BALL_MOVING
         power = 0f
@@ -187,6 +223,17 @@ class GameEngine(private val width: Float, private val height: Float) {
     private val maxPhysicsStep = 1f / 120f
 
     private fun advanceStep(dt: Float) {
+        if (phase == GamePhase.GOAL) {
+            goalCelebrationElapsed += dt
+            if (goalCelebrationElapsed >= goalCelebrationDuration) {
+                if (winner != null) {
+                    phase = GamePhase.MATCH_OVER
+                } else {
+                    beginKickoff(kickoffTeam)
+                }
+            }
+            return
+        }
         if (phase == GamePhase.KICKER_APPROACH) {
             approachElapsed += dt
             val progress = (approachElapsed / .36f).coerceIn(0f, 1f)
@@ -194,7 +241,9 @@ class GameEngine(private val width: Float, private val height: Float) {
             val from = approachFrom ?: return
             val to = approachTo ?: return
             val position = from + (to - from) * eased
-            players = players.map { if (it.id == focusedPlayerId) it.copy(position = position) else it }
+            players = players.map {
+                if (it.id == focusedPlayerId) it.copy(position = position, velocity = Vector2(0f, 0f)) else it
+            }
             val ballFrom = approachBallFrom ?: return
             val ballTo = approachBallTo ?: return
             ball = ball.copy(position = ballFrom + (ballTo - ballFrom) * eased)
@@ -224,6 +273,7 @@ class GameEngine(private val width: Float, private val height: Float) {
         var impactSideY = ball.impactSideY
         var impactStrength = (ball.impactStrength - dt * 3.2f).coerceAtLeast(0f)
         var landingStrength = (ball.landingStrength - dt * 4.8f).coerceAtLeast(0f)
+        var goalPostImpactStrength = (ball.goalPostImpactStrength - dt * 4f).coerceAtLeast(0f)
         if (impactStrength == 0f) {
             impactSideX = 0f
             impactSideY = 0f
@@ -241,15 +291,6 @@ class GameEngine(private val width: Float, private val height: Float) {
             velocity = Vector2(-velocity.x * wallBounceRestitution, velocity.y * wallTangentialRetention)
             verticalVelocity *= wallTangentialRetention
         }
-        if (position.y < minY || position.y > maxY) {
-            impactSideY = if (position.y > maxY) 1f else -1f
-            impactSideX = 0f
-            impactStrength = (abs(velocity.y) / 600f).coerceIn(.25f, 1f)
-            position = position.copy(y = position.y.coerceIn(minY, maxY))
-            velocity = Vector2(velocity.x * wallTangentialRetention, -velocity.y * wallBounceRestitution)
-            verticalVelocity *= wallTangentialRetention
-        }
-
         if (heightAboveGround < 0f) {
             heightAboveGround = 0f
             val landingSpeed = abs(verticalVelocity)
@@ -261,8 +302,65 @@ class GameEngine(private val width: Float, private val height: Float) {
 
         // Height is separate from field position. Sweep the same coordinates
         // used to draw the ball, so both teams make contact at equal distances.
+        val topGoalLine = wallInset + ballRadius
+        val bottomGoalLine = height - wallInset - ballRadius
+        val goalCrossing = goalLineCrossing(previousPosition, position, heightAboveGround, topGoalLine, bottomGoalLine)
+        val goalHalfWidth = width * .16f - ballRadius
+        val crossingOffsetX = goalCrossing?.let { it.x - width * .5f }
+        val isGoal = crossingOffsetX != null && abs(crossingOffsetX) <= goalHalfWidth
+        if (isGoal) {
+            val scoringTeam = goalCrossing.team
+            lastScoringTeam = scoringTeam
+            kickoffTeam = if (scoringTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+            if (scoringTeam == GameTeam.RED) redScore += 1 else blueScore += 1
+            winner = when {
+                targetScore == null -> null
+                redScore >= targetScore -> GameTeam.RED
+                blueScore >= targetScore -> GameTeam.BLUE
+                else -> null
+            }
+            goalCelebrationElapsed = 0f
+            val goalY = if (scoringTeam == GameTeam.RED) topGoalLine else bottomGoalLine
+            ball = ball.copy(
+                position = Vector2(position.x, goalY),
+                velocity = Vector2(0f, 0f),
+                height = 0f,
+                verticalVelocity = 0f,
+            )
+            phase = GamePhase.GOAL
+            return
+        }
+
+        if (goalCrossing != null && crossingOffsetX != null &&
+            abs(crossingOffsetX) <= width * .18f + ballRadius
+        ) {
+            // The cardboard posts sit on either side of the goal opening. A glancing
+            // impact sends the ball back into the field and adds a small sideways kick.
+            val postNormalX = if (crossingOffsetX < 0f) 1f else -1f
+            impactSideX = -postNormalX
+            impactSideY = if (goalCrossing.team == GameTeam.RED) -1f else 1f
+            impactStrength = (abs(velocity.y) / 600f).coerceIn(.35f, 1f)
+            goalPostImpactStrength = impactStrength
+            position = Vector2(goalCrossing.x, goalCrossing.lineY)
+            velocity = Vector2(
+                velocity.x * wallTangentialRetention + postNormalX * abs(velocity.y) * .16f,
+                -velocity.y * wallBounceRestitution,
+            )
+            verticalVelocity *= wallTangentialRetention
+        }
+
+        if (position.y < minY || position.y > maxY) {
+            impactSideY = if (position.y > maxY) 1f else -1f
+            impactSideX = 0f
+            impactStrength = (abs(velocity.y) / 600f).coerceIn(.25f, 1f)
+            position = position.copy(y = position.y.coerceIn(minY, maxY))
+            velocity = Vector2(velocity.x * wallTangentialRetention, -velocity.y * wallBounceRestitution)
+            verticalVelocity *= wallTangentialRetention
+        }
+
         val movement = position - previousPosition
         val travelVelocity = if (dt > 0f) movement * (1f / dt) else Vector2(0f, 0f)
+
         val collision = players.mapNotNull { player ->
             if (player.id == lastContactPlayerId && contactCooldownRemaining > 0f) return@mapNotNull null
             val center = player.position + Vector2(0f, playerCollisionOffsetY)
@@ -331,7 +429,7 @@ class GameEngine(private val width: Float, private val height: Float) {
         ball = ball.copy(position = position, velocity = velocity, height = heightAboveGround,
             verticalVelocity = verticalVelocity, rotationX = rotationX, rotationY = rotationY,
             impactSideX = impactSideX, impactSideY = impactSideY, impactStrength = impactStrength,
-            landingStrength = landingStrength)
+            landingStrength = landingStrength, goalPostImpactStrength = goalPostImpactStrength)
         if (velocity.length() < 14f && heightAboveGround == 0f && verticalVelocity == 0f) {
             ball = ball.copy(velocity = Vector2(0f, 0f))
             aimAngle = 0f
@@ -407,6 +505,54 @@ class GameEngine(private val width: Float, private val height: Float) {
         }
     }
 
+    private fun goalLineCrossing(
+        start: Vector2,
+        end: Vector2,
+        ballHeight: Float,
+        topGoalLine: Float,
+        bottomGoalLine: Float,
+    ): GoalLineCrossing? {
+        if (ballHeight > 36f) return null
+
+        val crossing = when {
+            start.y >= topGoalLine && end.y < topGoalLine -> GameTeam.RED to topGoalLine
+            start.y <= bottomGoalLine && end.y > bottomGoalLine -> GameTeam.BLUE to bottomGoalLine
+            else -> return null
+        }
+        val progress = ((crossing.second - start.y) / (end.y - start.y)).coerceIn(0f, 1f)
+        val crossingX = start.x + (end.x - start.x) * progress
+        return GoalLineCrossing(crossing.first, crossing.second, crossingX)
+    }
+
+    private fun beginKickoff(team: GameTeam) {
+        players = players.map { player ->
+            player.copy(
+                position = player.home,
+                velocity = Vector2(0f, 0f),
+                impactDirectionX = 0f,
+                impactDirectionY = 0f,
+                impactStrength = 0f,
+            )
+        }
+        focusedPlayerId = players.first { it.team == team && it.id.endsWith("center") }.id
+        ball = ball.copy(
+            position = Vector2(width * .5f, height * .5f),
+            velocity = Vector2(0f, 0f),
+            height = 0f,
+            verticalVelocity = 0f,
+            impactSideX = 0f,
+            impactSideY = 0f,
+            impactStrength = 0f,
+            landingStrength = 0f,
+            goalPostImpactStrength = 0f,
+        )
+        aimAngle = 0f
+        power = 0f
+        lastContactPlayerId = null
+        contactCooldownRemaining = 0f
+        beginKickerApproach()
+    }
+
     private fun firstCircleContactTime(start: Vector2, end: Vector2, center: Vector2, radius: Float): Float? {
         val movement = end - start
         val offset = start - center
@@ -446,6 +592,9 @@ class GameEngine(private val width: Float, private val height: Float) {
         approachBallFrom = ball.position
         approachBallTo = readyBallPosition
         approachElapsed = 0f
+        players = players.map {
+            if (it.id == focusedPlayerId) it.copy(velocity = Vector2(0f, 0f)) else it
+        }
         phase = GamePhase.KICKER_APPROACH
     }
 
