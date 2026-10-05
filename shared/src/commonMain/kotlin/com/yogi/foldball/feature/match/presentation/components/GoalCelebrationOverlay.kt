@@ -1,4 +1,4 @@
-package com.yogi.foldball.feature.match.components
+package com.yogi.foldball.feature.match.presentation.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,10 +22,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballShapes
+import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.PaperCard
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -37,6 +39,7 @@ import kotlin.math.sin
 fun GoalCelebrationOverlay(
     visible: Boolean,
     scoringTeam: GameTeam?,
+    teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
 ) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AnimatedVisibility(
@@ -52,9 +55,9 @@ fun GoalCelebrationOverlay(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 val teamColor = if (scoringTeam == GameTeam.RED) {
-                    Color(0xFFBD3031)
+                    FoldballColor.TeamRed
                 } else {
-                    Color(0xFF23477F)
+                    FoldballColor.InkBlue
                 }
                 Canvas(Modifier.size(216.dp)) {
                     val center = Offset(size.width / 2f, size.height / 2f)
@@ -63,7 +66,7 @@ fun GoalCelebrationOverlay(
                     repeat(12) { index ->
                         val angle = index * (2f * PI.toFloat() / 12f)
                         drawLine(
-                            color = Color(0xFFD5A657).copy(alpha = .7f),
+                            color = FoldballColor.Tape.copy(alpha = .7f),
                             start = center + Offset(cos(angle), sin(angle)) * innerRadius,
                             end = center + Offset(cos(angle), sin(angle)) * outerRadius,
                             strokeWidth = 2.dp.toPx(),
@@ -71,18 +74,16 @@ fun GoalCelebrationOverlay(
                         )
                     }
                     drawCircle(
-                        color = Color(0xFFE8C980).copy(alpha = .7f),
+                        color = FoldballColor.Tape.copy(alpha = .7f),
                         radius = size.minDimension * .39f,
                         style = Stroke(width = 1.5.dp.toPx()),
                     )
                 }
-                Surface(
+                PaperCard(
                     modifier = Modifier.padding(horizontal = 28.dp),
-                    color = Color(0xFFFFF8E9),
-                    contentColor = Color(0xFF24314A),
-                    shape = RoundedCornerShape(8.dp),
-                    shadowElevation = 10.dp,
-                    border = BorderStroke(1.dp, Color(0xFFC9B895)),
+                    shape = FoldballShapes.Banner,
+                    tilt = FoldballTilt.GoalCelebration,
+                    ruled = false,
                 ) {
                     Column(
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 17.dp),
@@ -92,16 +93,13 @@ fun GoalCelebrationOverlay(
                         Text(
                             text = "GOOOL!",
                             color = teamColor,
-                            fontSize = 29.sp,
-                            fontWeight = FontWeight.Black,
+                            style = FoldballType.LargeTitle,
                             letterSpacing = .5.sp,
                         )
                         Text(
-                            text = "TIM ${scoringTeam?.name.orEmpty()}",
-                            color = Color(0xFF24314A),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = .8.sp,
+                            text = "TEAM ${scoringTeam?.let { teamConfiguration.forTeam(it).name }.orEmpty()}",
+                            color = FoldballColor.Ink,
+                            style = FoldballType.Label,
                         )
                     }
                 }

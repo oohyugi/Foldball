@@ -1,4 +1,4 @@
-package com.yogi.foldball.presentation.ball
+package com.yogi.foldball.gamekit.presentation.ball
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.yogi.foldball.core.ui.theme.FoldballColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -35,16 +36,16 @@ val MatchBallVisualSize = 16.dp
 
 /** Motion cases shown by the standalone ball presentation. */
 enum class BallEffect(val label: String, val description: String, val durationMillis: Int) {
-    ROLL("Roll halus", "Sudut tekstur mengikuti jarak tempuh", 1100),
-    AIR_BOUNCE("Bola melambung", "Tinggi visual dan bayangan terpisah", 1000),
-    WALL_BOUNCE("Pantul dinding", "Streak pendek mengikuti arah pantulan", 950),
-    PLAYER_BOUNCE("Pantul pemain", "Ring dan serpihan saat kontak", 950),
-    HIT_SOFT("Impact lembut", "Squash ringan dan ring tipis", 800),
-    HIT_HARD("Impact keras", "Deformasi lebih kuat saat kontak", 800),
-    LANDING("Landing", "Bola turun, shadow menguat, debu menyebar", 1000),
-    SKID("Skid", "Jejak gesek memudar di belakang bola", 1000),
-    SPEED_TRAIL("Speed trail", "Jejak mengikuti lintasan dan kecepatan", 1000),
-    GOAL("Goal burst", "Paper flakes dan confetti saat goal", 1250),
+    ROLL("Smooth roll", "Texture rotates with travel distance", 1100),
+    AIR_BOUNCE("Air bounce", "Visual height and shadow separate", 1000),
+    WALL_BOUNCE("Wall bounce", "Short streak follows the rebound", 950),
+    PLAYER_BOUNCE("Player bounce", "Ring and paper flecks on contact", 950),
+    HIT_SOFT("Soft impact", "Light squash and a thin ring", 800),
+    HIT_HARD("Hard impact", "Stronger deformation on contact", 800),
+    LANDING("Landing", "Ball drops, shadow sharpens, dust spreads", 1000),
+    SKID("Skid", "Friction trail fades behind the ball", 1000),
+    SPEED_TRAIL("Speed trail", "Trail follows the path and speed", 1000),
+    GOAL("Goal burst", "Paper flakes and confetti on goal", 1250),
 }
 
 /**
@@ -82,13 +83,13 @@ fun PaperBall(
                     else -> .5f
                 },
             )
-        }.clipToBounds().semantics { contentDescription = "Bola kertas Foldball" },
+        }.clipToBounds().semantics { contentDescription = "Foldball paper ball" },
     ) {
         val radius = minOf(size.width, size.height) * .5f
         val center = Offset(size.width * .5f, size.height * .5f)
         if (radius <= 0f) return@Canvas
 
-        drawCircle(Color(0xFFF8F5EC), radius, center)
+        drawCircle(FoldballColor.Paper, radius, center)
         val ballMask = Path().apply {
             addOval(Rect(center.x - radius, center.y - radius, center.x + radius, center.y + radius))
         }
@@ -129,7 +130,7 @@ fun PaperBall(
                 )
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF765D4D).copy(alpha = impact * .28f), Color.Transparent),
+                        colors = listOf(FoldballColor.WoodDark.copy(alpha = impact * .28f), Color.Transparent),
                         center = contact,
                         radius = radius * .62f,
                     ),
@@ -144,7 +145,7 @@ fun PaperBall(
                     val start = Offset(x - impactSideX * radius * .025f - impactSideY * tangent, y - impactSideY * radius * .025f + impactSideX * tangent)
                     val end = Offset(center.x - impactSideX * radius * (.24f + index * .07f), center.y - impactSideY * radius * (.24f + index * .07f) + tangent * .42f)
                     drawLine(
-                        color = Color(0xFF765D4D).copy(alpha = impact * .52f),
+                        color = FoldballColor.WoodDark.copy(alpha = impact * .52f),
                         start = start,
                         end = end,
                         strokeWidth = (1f + impact * 1.2f).dp.toPx(),

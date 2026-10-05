@@ -1,4 +1,4 @@
-package com.yogi.foldball.feature.match
+package com.yogi.foldball.feature.match.presentation.screen
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Animatable
@@ -6,12 +6,16 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +29,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -39,43 +46,60 @@ import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
-import com.yogi.foldball.feature.match.components.MatchStatusPanel
-import com.yogi.foldball.feature.match.components.OpeningTossOverlay
-import com.yogi.foldball.feature.match.components.OpeningTossStatusPanel
+import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
+import com.yogi.foldball.feature.match.presentation.components.MatchStatusPanel
+import com.yogi.foldball.feature.match.presentation.components.OpeningTossOverlay
 import com.yogi.foldball.domain.game.engine.Vector2
-import com.yogi.foldball.feature.match.components.PowerTimingMeter
-import com.yogi.foldball.feature.match.components.MatchScoreboard
-import com.yogi.foldball.feature.match.components.GoalCelebrationOverlay
-import com.yogi.foldball.presentation.ball.PaperBall
-import com.yogi.foldball.presentation.ball.MatchBallVisualSize
-import com.yogi.foldball.presentation.field.ClassroomStadium
-import com.yogi.foldball.presentation.player.PaperPlayer
-import com.yogi.foldball.presentation.player.PlayerFacing
-import com.yogi.foldball.presentation.player.PlayerFocusState
-import com.yogi.foldball.presentation.player.rememberPlayerMotionState
+import com.yogi.foldball.feature.match.presentation.components.PowerTimingMeter
+import com.yogi.foldball.feature.match.presentation.components.MatchScoreboard
+import com.yogi.foldball.feature.match.presentation.components.GoalCelebrationOverlay
+import com.yogi.foldball.gamekit.presentation.ball.PaperBall
+import com.yogi.foldball.gamekit.presentation.ball.MatchBallVisualSize
+import com.yogi.foldball.gamekit.presentation.field.ClassroomStadium
+import com.yogi.foldball.gamekit.presentation.player.PaperPlayer
+import com.yogi.foldball.gamekit.presentation.player.PlayerFacing
+import com.yogi.foldball.gamekit.presentation.player.PlayerFocusState
+import com.yogi.foldball.gamekit.presentation.player.rememberPlayerMotionState
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballShapes
+import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperButtonStyle
+import com.yogi.foldball.core.ui.theme.PaperChip
+import com.yogi.foldball.core.ui.theme.PaperCard
+import com.yogi.foldball.core.ui.theme.PaperDialog
+import com.yogi.foldball.core.ui.theme.TapeLabel
 import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.home_desk_classroom
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 
 private const val powerMeterCycleSeconds = 1.8f
 private const val minimumTimingPower = .05f
+private const val formationOpponentAlpha = .68f
 
 @Composable
-fun MatchSandboxScreen(timing: MatchTimingConfig = MatchTimingConfig()) =
-    MatchExperienceScreen(fullMatch = false, timing = timing)
+fun MatchSandboxScreen(
+    timing: MatchTimingConfig = MatchTimingConfig(),
+    teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
+) = MatchExperienceScreen(fullMatch = false, timing = timing, teamConfiguration = teamConfiguration)
 
 @Composable
 fun FullMatchScreen(
     timing: MatchTimingConfig = MatchTimingConfig(),
+    teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
     onOpenTools: (String) -> Unit,
 ) = MatchExperienceScreen(
     fullMatch = true,
     timing = timing,
+    teamConfiguration = teamConfiguration,
     onOpenTools = onOpenTools,
 )
 
@@ -83,9 +107,11 @@ fun FullMatchScreen(
 private fun MatchExperienceScreen(
     fullMatch: Boolean,
     timing: MatchTimingConfig,
+    teamConfiguration: MatchTeamConfiguration,
     onOpenTools: (String) -> Unit = {},
 ) {
     val density = LocalDensity.current.density
+    val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val playerMotion = rememberPlayerMotionState()
     var isPaused by remember { mutableStateOf(false) }
@@ -97,7 +123,10 @@ private fun MatchExperienceScreen(
     var redScore by remember { mutableIntStateOf(0) }
     var blueScore by remember { mutableIntStateOf(0) }
     var matchElapsedSeconds by remember { mutableIntStateOf(0) }
+    var phaseSeconds by remember { mutableIntStateOf(timing.defenseSeconds) }
+    var activeTeam by remember { mutableStateOf(GameTeam.RED) }
     var showMatchMenu by remember { mutableStateOf(false) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
     var showShareSummary by remember { mutableStateOf(false) }
     LaunchedEffect(fullMatch, isPaused, isMatchFinished, openingKickoffTeam) {
         if (fullMatch && !isMatchFinished && openingKickoffTeam != null) {
@@ -113,18 +142,28 @@ private fun MatchExperienceScreen(
                 painter = painterResource(Res.drawable.home_desk_classroom),
                 contentScale = ContentScale.Crop,
             )
-            .padding(horizontal = 6.dp, vertical = 5.dp)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(start = 6.dp, top = 5.dp, end = 6.dp, bottom = 16.dp)
         else Modifier.fillMaxSize().background(Color(0xFFF5F0E6))
             .verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         if (fullMatch) {
             MatchScoreboard(
-                elapsedSeconds = matchElapsedSeconds,
                 isPaused = isPaused,
-                onMenuClick = { showMatchMenu = true },
-                onShareClick = { showShareSummary = true },
-                onPauseClick = { isPaused = !isPaused },
+                onPauseClick = {
+                    if (isPaused) {
+                        isPaused = false
+                        showMatchMenu = false
+                    } else {
+                        isPaused = true
+                        showMatchMenu = true
+                    }
+                },
+                phaseSeconds = phaseSeconds,
+                activeTeam = activeTeam,
+                teamConfiguration = teamConfiguration,
                 blueScore = blueScore,
                 redScore = redScore,
             )
@@ -138,13 +177,13 @@ private fun MatchExperienceScreen(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    "Gerak formasi & bola",
+                    "Player and ball movement",
                     color = Color(0xFF24314A),
                     fontSize = 25.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    "Geser pemain · bidik · timing power · lihat pantulan",
+                    "Move players · aim · time your shot · watch the bounce",
                     color = Color(0xFF777A80),
                     fontSize = 13.sp
                 )
@@ -155,10 +194,9 @@ private fun MatchExperienceScreen(
             Modifier.fillMaxWidth().then(if (fullMatch) Modifier.weight(1f) else Modifier)
         ) {
             val fieldWidth = maxWidth.value
-            val fieldHeight = if (fullMatch) {
-                (maxHeight.value - 88f).coerceAtLeast(240f)
-            } else {
-                470f
+            // Keep arena geometry stable through toss, defense, and aim phases.
+            val fieldHeight = remember(fullMatch, fieldWidth) {
+                if (fullMatch) (maxHeight.value - 88f).coerceAtLeast(240f) else 470f
             }
             val engine = remember(fieldWidth, fieldHeight, matchKey, openingKickoffTeam) {
                 GameEngine(fieldWidth, fieldHeight,
@@ -168,12 +206,45 @@ private fun MatchExperienceScreen(
                 )
             }
             var state by remember(engine) { mutableStateOf(engine.snapshot) }
+            val formationOpen = state.phase == GamePhase.DEFENDING && state.phaseTimeRemaining > 0f
+            var previousHapticPhase by remember(engine) { mutableStateOf(state.phase) }
             val goalShake = remember(engine) { Animatable(0f) }
             var kickingPlayerId by remember(engine) { mutableStateOf<String?>(null) }
             var movingPlayerId by remember(engine) { mutableStateOf<String?>(null) }
+            var movingPlayerOrigin by remember(engine) { mutableStateOf<Vector2?>(null) }
+            var selectedFormationPlayerId by remember(engine) { mutableStateOf<String?>(null) }
             var showAimGuide by remember(engine) { mutableStateOf(false) }
             var isPowerTiming by remember(engine) { mutableStateOf(false) }
-            LaunchedEffect(state.phase) {
+            LaunchedEffect(state.phase, formationOpen) {
+                val oldPhase = previousHapticPhase
+                if (oldPhase != state.phase) {
+                    when (state.phase) {
+                        GamePhase.DEFENDING, GamePhase.AIMING ->
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        GamePhase.BALL_MOVING -> if (oldPhase == GamePhase.AIMING) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                        GamePhase.GOAL ->
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        else -> Unit
+                    }
+                    if (state.phase == GamePhase.BALL_MOVING && oldPhase == GamePhase.AIMING &&
+                        kickingPlayerId != state.focusedPlayerId
+                    ) {
+                        val shooterId = state.focusedPlayerId
+                        kickingPlayerId = shooterId
+                        playerMotion.setPowerProgress(state.lastShotPower)
+                        playerMotion.setAimAngle(state.aimAngle)
+                        playerMotion.releaseChargedKick()
+                        if (kickingPlayerId == shooterId) kickingPlayerId = null
+                    }
+                }
+                previousHapticPhase = state.phase
+                if (!formationOpen) {
+                    selectedFormationPlayerId = null
+                    movingPlayerId = null
+                    movingPlayerOrigin = null
+                }
                 if (state.phase == GamePhase.TURNOVER_RETREAT) {
                     isPowerTiming = false
                     showAimGuide = false
@@ -220,6 +291,14 @@ private fun MatchExperienceScreen(
                 }
             }
 
+            fun finishPlayerMove(playerId: String) {
+                val movesBefore = engine.defensiveMovesUsed
+                engine.endPlayerMove(playerId)
+                if (engine.defensiveMovesUsed > movesBefore) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            }
+
             LaunchedEffect(engine, isPaused) {
                 var previous = 0L
                 while (true) {
@@ -232,6 +311,12 @@ private fun MatchExperienceScreen(
                             state = nextState
                             redScore = nextState.redScore
                             blueScore = nextState.blueScore
+                            phaseSeconds = ceil(nextState.phaseTimeRemaining).toInt().coerceAtLeast(0)
+                            val possessionTeam = nextState.players.first { it.id == nextState.focusedPlayerId }.team
+                            activeTeam = when (nextState.phase) {
+                                GamePhase.DEFENDING -> if (possessionTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+                                else -> possessionTeam
+                            }
                             if (nextState.winner != null) isMatchFinished = true
                         }
                         previous = now
@@ -269,6 +354,26 @@ private fun MatchExperienceScreen(
                     14.dp
                 ),
             ) {
+                val possessionTeam = state.players.first { it.id == state.focusedPlayerId }.team
+                val turnTeam = if (state.phase == GamePhase.DEFENDING) {
+                    if (possessionTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+                } else possessionTeam
+                val turnLabel = when (state.phase) {
+                    GamePhase.DEFENDING -> if (state.openingKickoffPending) {
+                        "FORMATION · ${teamConfiguration.forTeam(turnTeam).name} · OWN HALF"
+                    } else {
+                        "SET FORMATION · ${teamConfiguration.forTeam(turnTeam).name} · TAP PLAYER"
+                    }
+                    GamePhase.AIMING -> "KICK · ${teamConfiguration.forTeam(turnTeam).name}"
+                    GamePhase.KICKER_APPROACH -> "KICK NEXT · ${teamConfiguration.forTeam(turnTeam).name}"
+                    GamePhase.BALL_MOVING -> "SHOT IN PLAY · ${teamConfiguration.forTeam(possessionTeam).name}"
+                    GamePhase.TURNOVER_RETREAT -> "TURNOVER · ${teamConfiguration.forTeam(possessionTeam).name}"
+                    GamePhase.GOAL -> "GOAL · ${state.lastScoringTeam?.let { teamConfiguration.forTeam(it).name }.orEmpty()}"
+                    GamePhase.MATCH_OVER -> "MATCH COMPLETE"
+                }
+                if (!(fullMatch && openingKickoffTeam == null)) {
+                    TapeLabel(turnLabel, Modifier.align(Alignment.CenterHorizontally))
+                }
                 ClassroomStadium(
                     fieldWidthDp = fieldWidth,
                     fieldHeightDp = fieldHeight,
@@ -277,14 +382,41 @@ private fun MatchExperienceScreen(
                     shakeBottomGoal = state.phase == GamePhase.GOAL && state.lastScoringTeam == GameTeam.BLUE,
                 ) {
                     if (fullMatch && openingKickoffTeam == null) {
-                        OpeningTossOverlay(onWinner = { openingKickoffTeam = it })
+                        OpeningTossOverlay(
+                            teamConfiguration = teamConfiguration,
+                            onWinner = { openingKickoffTeam = it },
+                        )
                     } else {
                     Canvas(Modifier.fillMaxSize()) {
                         val h = size.height
-                        if (state.phase == GamePhase.DEFENDING && movingPlayerId != null) {
+                        if (formationOpen) {
                             val cellWidth = size.width / GameEngine.ZONE_COLUMNS
                             val cellHeight = size.height / GameEngine.ZONE_ROWS
-                            val movingId = movingPlayerId!!
+                            fun zoneAt(position: Vector2): Int {
+                                val column = (position.x / (fieldWidth / GameEngine.ZONE_COLUMNS))
+                                    .toInt().coerceIn(0, GameEngine.ZONE_COLUMNS - 1)
+                                val rowFromTop = (position.y / (fieldHeight / GameEngine.ZONE_ROWS))
+                                    .toInt().coerceIn(0, GameEngine.ZONE_ROWS - 1)
+                                val rowFromBottom = GameEngine.ZONE_ROWS - 1 - rowFromTop
+                                return rowFromBottom * GameEngine.ZONE_COLUMNS + column + 1
+                            }
+                            val selectedMoveId = movingPlayerId ?: selectedFormationPlayerId
+                                ?.takeIf(engine::canMovePlayer)
+                            val selectedPlayer = state.players.firstOrNull { it.id == selectedMoveId }
+                            val originPosition = movingPlayerOrigin ?: selectedPlayer?.position
+                            val originZones = originPosition?.let { setOf(zoneAt(it)) }.orEmpty()
+                            val legalDestinations = if (selectedMoveId == null) emptyMap() else
+                                (1..GameEngine.ZONE_COUNT).associateWith { zone ->
+                                    if (zone in originZones) null
+                                    else engine.legalPlayerPositionInZone(selectedMoveId, zone)
+                                }
+                            val adjacentZones = if (selectedMoveId == null) emptySet() else
+                                (1..GameEngine.ZONE_COUNT).filterTo(mutableSetOf()) { zone ->
+                                    engine.isAdjacentZoneForPlayer(selectedMoveId, zone)
+                                }
+                            val movementDash = PathEffect.dashPathEffect(
+                                floatArrayOf(7.dp.toPx(), 5.dp.toPx()),
+                            )
                             val fieldInset = 18.dp.toPx()
                             clipRect(
                                 left = fieldInset,
@@ -297,12 +429,31 @@ private fun MatchExperienceScreen(
                                     val column = index % GameEngine.ZONE_COLUMNS
                                     val rowFromTop = GameEngine.ZONE_ROWS - 1 - index / GameEngine.ZONE_COLUMNS
                                     val topLeft = Offset(column * cellWidth, rowFromTop * cellHeight)
-                                    val color = when {
-                                        engine.isZoneAvailableForPlayer(movingId, zone) -> Color(0x2B3CA66B)
-                                        engine.isZoneOccupied(zone, exceptPlayerId = movingId) -> Color(0x223E2723)
-                                        else -> Color.Transparent
+                                    val available = legalDestinations[zone] != null
+                                    if (available || zone in adjacentZones) {
+                                        drawRect(
+                                            color = if (available) {
+                                                selectedPlayer?.let { player ->
+                                                    if (player.team == GameTeam.RED) FoldballColor.TeamRed
+                                                    else FoldballColor.InkBlue
+                                                }?.copy(alpha = .12f) ?: FoldballColor.BallHighlight.copy(alpha = .12f)
+                                            } else {
+                                                Color(0xFFB8BCC1).copy(alpha = .10f)
+                                            },
+                                            topLeft = topLeft,
+                                            size = Size(cellWidth, cellHeight),
+                                        )
+                                        drawRect(
+                                            color = if (available) FoldballColor.BallHighlight.copy(alpha = .72f)
+                                            else Color(0xFFB8BCC1).copy(alpha = .42f),
+                                            topLeft,
+                                            Size(cellWidth, cellHeight),
+                                            style = Stroke(
+                                                width = if (available) 1.1.dp.toPx() else .8.dp.toPx(),
+                                                pathEffect = if (available) movementDash else null,
+                                            ),
+                                        )
                                     }
-                                    drawRect(color, topLeft, Size(cellWidth, cellHeight))
                                 }
                             }
                         }
@@ -335,11 +486,16 @@ private fun MatchExperienceScreen(
 
                     state.players.forEach { player ->
                         val focused = player.id == state.focusedPlayerId
-                        val activeTeam = state.players.first { it.id == state.focusedPlayerId }.team
                         val canMove = engine.canMovePlayer(player.id)
                         val isKicking = player.id == kickingPlayerId
-                        val showFocus = focused && (state.phase == GamePhase.DEFENDING || state.phase == GamePhase.AIMING)
-                        val playerSize = 76.dp
+                        val showFocus = focused && (
+                            state.phase == GamePhase.KICKER_APPROACH || state.phase == GamePhase.AIMING
+                        )
+                        val showFormation = formationOpen && player.team == turnTeam && canMove
+                        val playerSize = minOf(
+                            76f,
+                            fieldHeight / GameEngine.ZONE_ROWS * 1.5f,
+                        ).dp
                         val visualAimAngle =
                             if (player.team == GameTeam.RED) state.aimAngle else -state.aimAngle
                         val displayedX by animateDpAsState(
@@ -352,28 +508,53 @@ private fun MatchExperienceScreen(
                         )
                         val kickProgress = if (isKicking) playerMotion.kickProgress else 0f
                         val kickDirectionY = if (player.team == GameTeam.RED) -1f else 1f
+                        val targetPlayerAlpha = when (state.phase) {
+                            GamePhase.DEFENDING -> if (player.team == turnTeam) 1f else formationOpponentAlpha
+                            else -> 1f
+                        }
+                        val playerAlpha by animateFloatAsState(
+                            targetValue = targetPlayerAlpha,
+                            animationSpec = tween(durationMillis = 360),
+                            label = "${player.team.name.lowercase()}-turn-alpha",
+                        )
                         PaperPlayer(
                             modifier = Modifier.offset(
                                 displayedX - playerSize / 2 + 8.dp * (sin(visualAimAngle) * kickProgress),
                                 displayedY - playerSize / 2 + 20.dp * (kickDirectionY * cos(visualAimAngle) * kickProgress),
                             )
                                 .size(playerSize)
-                                .pointerInput(player.id, focused, state.phase, isPaused, activeTeam, canMove) {
-                                    if (!focused && canMove && !isPaused && state.phase == GamePhase.DEFENDING && player.team != activeTeam) {
+                                .graphicsLayer { alpha = playerAlpha }
+                                .clickable(
+                                    enabled = !focused && canMove && !isPaused &&
+                                        formationOpen && player.team == turnTeam,
+                                    onClick = { selectedFormationPlayerId = player.id },
+                                )
+                                .pointerInput(player.id, focused, formationOpen, isPaused, turnTeam, canMove) {
+                                    if (!focused && canMove && !isPaused && formationOpen && player.team == turnTeam) {
                                         detectDragGestures(
                                             onDragStart = {
+                                                selectedFormationPlayerId = player.id
                                                 movingPlayerId = player.id
+                                                movingPlayerOrigin = player.position
                                                 engine.beginPlayerMove(player.id)
                                                 refresh()
                                             },
                                             onDragEnd = {
-                                                engine.endPlayerMove(player.id)
+                                                finishPlayerMove(player.id)
                                                 movingPlayerId = null
+                                                movingPlayerOrigin = null
+                                                if (!engine.canMovePlayer(player.id)) {
+                                                    selectedFormationPlayerId = null
+                                                }
                                                 refresh()
                                             },
                                             onDragCancel = {
-                                                engine.endPlayerMove(player.id)
+                                                finishPlayerMove(player.id)
                                                 movingPlayerId = null
+                                                movingPlayerOrigin = null
+                                                if (!engine.canMovePlayer(player.id)) {
+                                                    selectedFormationPlayerId = null
+                                                }
                                                 refresh()
                                             },
                                         ) { change, drag ->
@@ -411,6 +592,7 @@ private fun MatchExperienceScreen(
                             focusState = when {
                                 showFocus -> PlayerFocusState.FOCUSED
                                 isKicking -> PlayerFocusState.KICKING
+                                showFormation -> PlayerFocusState.FORMATION
                                 else -> PlayerFocusState.INACTIVE
                             },
                             powerProgress = when {
@@ -425,31 +607,28 @@ private fun MatchExperienceScreen(
                             impactDirectionX = player.impactDirectionX,
                             impactDirectionY = player.impactDirectionY,
                             impactStrength = player.impactStrength,
-                            jerseyColor = if (player.team == GameTeam.RED) Color(0xFFD94038) else Color(
-                                0xFF3269A8
-                            ),
-                            number = if (player.team == GameTeam.RED) player.id.removePrefix("red-")
-                                .take(1).uppercase() else player.id.removePrefix("blue-").take(1)
-                                .uppercase(),
-                            name = if (showFocus || isKicking) "KICKER" else if (player.team == GameTeam.RED) "RED" else "BLUE",
+                            inactiveAlpha = 1f,
+                            jerseyColor = if (player.team == GameTeam.RED) FoldballColor.TeamRed else FoldballColor.InkBlue,
+                            number = player.jerseyNumber.toString(),
+                            name = teamConfiguration.forTeam(player.team).jerseyLabel,
                         )
                     }
 
                     val ballSpeed = (state.ball.velocity.length() / 670f).coerceIn(0f, 1f)
                     val ballLift = (state.ball.height / 36f).coerceIn(0f, 1f)
                     val groundContact = (1f - state.ball.height / 5f).coerceIn(0f, 1f)
-                    val shadowWidth = 21.dp + 12.dp * ballLift
-                    val shadowHeight = 6.dp + 5.dp * ballLift
+                    val shadowWidth = 15.dp + 15.dp * ballLift
+                    val shadowHeight = 3.dp + 4.dp * ballLift
                     Canvas(
                         Modifier.offset(
-                            state.ball.position.x.dp + 7.dp * ballLift - shadowWidth / 2,
-                            state.ball.position.y.dp + 12.dp + 10.dp * ballLift - shadowHeight / 2,
+                            state.ball.position.x.dp + 4.dp * ballLift - shadowWidth / 2,
+                            state.ball.position.y.dp + MatchBallVisualSize / 2 + 1.dp + 8.dp * ballLift - shadowHeight / 2,
                         ).size(shadowWidth, shadowHeight),
                     ) {
                         drawOval(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    Color(0xFF51483D).copy(alpha = .17f * groundContact + .045f * ballLift),
+                                    FoldballColor.ShadowBrown.copy(alpha = .20f * groundContact + .035f * ballLift),
                                     Color.Transparent,
                                 ),
                                 center = Offset(size.width / 2f, size.height / 2f),
@@ -457,10 +636,10 @@ private fun MatchExperienceScreen(
                             ),
                         )
                         if (groundContact > .01f) {
-                            val contactWidth = 14.dp.toPx()
-                            val contactHeight = 2.5.dp.toPx()
+                            val contactWidth = 10.dp.toPx()
+                            val contactHeight = 1.8.dp.toPx()
                             drawOval(
-                                color = Color(0xFF51483D).copy(alpha = .26f * groundContact),
+                                color = FoldballColor.ShadowBrown.copy(alpha = .22f * groundContact),
                                 topLeft = Offset(
                                     (size.width - contactWidth) / 2f,
                                     (size.height - contactHeight) / 2f
@@ -625,82 +804,85 @@ private fun MatchExperienceScreen(
                     GoalCelebrationOverlay(
                         visible = state.phase == GamePhase.GOAL,
                         scoringTeam = state.lastScoringTeam,
+                        teamConfiguration = teamConfiguration,
                     )
                     }
                 }
 
-                if (fullMatch && openingKickoffTeam == null) {
-                    OpeningTossStatusPanel()
-                } else {
+                if (!(fullMatch && openingKickoffTeam == null)) {
                     MatchStatusPanel(
                         snapshot = state,
                         defensiveMovesUsed = engine.defensiveMovesUsed,
                         canUndo = engine.canUndoPlayerMove(),
                         isPaused = isPaused,
                         showPower = !fullMatch,
+                        teamConfiguration = teamConfiguration,
                         onUndo = { engine.undoLastPlayerMove(); refresh() },
                         onFinishDefense = { engine.finishDefense(); refresh() },
+                        compactMatchBar = fullMatch,
                     )
                 }
             }
 
             if (showMatchMenu) {
-                AlertDialog(
-                    onDismissRequest = { showMatchMenu = false },
-                    title = { Text("MENU PERTANDINGAN") },
-                    text = {
-                        Column {
-                            TextButton(onClick = {
-                                showMatchMenu = false; onOpenTools("home")
-                            }) { Text("Beranda") }
-                            TextButton(onClick = {
-                                showMatchMenu = false; onOpenTools("movement")
-                            }) { Text("Movement Lab") }
-                            TextButton(onClick = {
-                                showMatchMenu = false; onOpenTools("ball")
-                            }) { Text("Ball Lab") }
-                            TextButton(onClick = {
-                                showMatchMenu = false; onOpenTools("player")
-                            }) { Text("Player Lab") }
+                Dialog(onDismissRequest = { showMatchMenu = false; isPaused = false }) {
+                    PaperCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = FoldballShapes.Banner,
+                        tilt = FoldballTilt.MatchMenu,
+                        ruled = false,
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(22.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text("MATCH PAUSED", style = FoldballType.Title, color = FoldballColor.Ink)
+                            PaperButton("Resume", { showMatchMenu = false; isPaused = false }, Modifier.fillMaxWidth())
+                            PaperButton("Match summary", { showMatchMenu = false; showShareSummary = true; isPaused = false }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Secondary)
+                            PaperButton("Home", { showMatchMenu = false; showExitConfirmation = true }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Danger)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                PaperChip("Move", { isPaused = false; showMatchMenu = false; onOpenTools("movement") }, "Open Movement Lab", Modifier.weight(1f))
+                                PaperChip("Ball", { isPaused = false; showMatchMenu = false; onOpenTools("ball") }, "Open Ball Lab", Modifier.weight(1f))
+                                PaperChip("Player", { isPaused = false; showMatchMenu = false; onOpenTools("player") }, "Open Player Lab", Modifier.weight(1f))
+                            }
                         }
+                    }
+                }
+            }
+            if (showExitConfirmation) {
+                PaperDialog(
+                    title = "RETURN HOME?",
+                    message = "The current match will end. Are you sure you want to leave?",
+                    onDismiss = { showExitConfirmation = false; isPaused = false },
+                    confirmText = "Leave match",
+                    onConfirm = {
+                        showExitConfirmation = false
+                        onOpenTools("home")
                     },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showMatchMenu = false
-                        }) { Text("Lanjut") }
-                    },
+                    dismissText = "Keep playing",
+                    danger = true,
                 )
             }
             if (showShareSummary) {
-                AlertDialog(
-                    onDismissRequest = { showShareSummary = false },
-                    title = { Text("RINGKASAN MATCH") },
-                    text = {
-                        Text(
-                            "BIRU $blueScore – $redScore MERAH\n${matchElapsedSeconds / 60}:${
-                                (matchElapsedSeconds % 60).toString().padStart(2, '0')
-                            } · FIRST TO 3"
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showShareSummary = false
-                        }) { Text("Tutup") }
-                    },
+                PaperDialog(
+                    title = "MATCH SUMMARY",
+                    message = "${teamConfiguration.forTeam(GameTeam.BLUE).jerseyLabel} $blueScore – $redScore ${teamConfiguration.forTeam(GameTeam.RED).jerseyLabel}\n${matchElapsedSeconds / 60}:${
+                        (matchElapsedSeconds % 60).toString().padStart(2, '0')
+                    } · FIRST TO 3",
+                    onDismiss = { showShareSummary = false },
+                    confirmText = "Close",
+                    onConfirm = { showShareSummary = false },
+                    dismissText = null,
                 )
             }
             if (fullMatch && state.phase == GamePhase.MATCH_OVER) {
                 val winningTeam = state.winner
-                AlertDialog(
-                    onDismissRequest = {},
-                    title = { Text("PERTANDINGAN SELESAI") },
-                    text = {
-                        Text(
-                            "TIM ${winningTeam?.name} MENANG\nBIRU ${state.blueScore} – ${state.redScore} MERAH"
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
+                PaperDialog(
+                    title = "MATCH COMPLETE",
+                    message = "TEAM ${winningTeam?.let { teamConfiguration.forTeam(it).name }} WINS\n${teamConfiguration.forTeam(GameTeam.BLUE).jerseyLabel} ${state.blueScore} – ${state.redScore} ${teamConfiguration.forTeam(GameTeam.RED).jerseyLabel}",
+                    confirmText = "Play again",
+                    onConfirm = {
                             matchKey += 1
                             isMatchFinished = false
                             isPaused = false
@@ -708,11 +890,9 @@ private fun MatchExperienceScreen(
                             redScore = 0
                             blueScore = 0
                             showShareSummary = false
-                        }) { Text("Main lagi") }
                     },
-                    dismissButton = {
-                        TextButton(onClick = { onOpenTools("home") }) { Text("Beranda") }
-                    },
+                    dismissText = "Home",
+                    onDismiss = { onOpenTools("home") },
                 )
             }
         }

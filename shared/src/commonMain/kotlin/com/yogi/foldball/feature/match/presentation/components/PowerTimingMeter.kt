@@ -1,28 +1,23 @@
-package com.yogi.foldball.feature.match.components
+package com.yogi.foldball.feature.match.presentation.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.TapeLabel
 
 private val powerSegments = listOf(
     Color(0xFFE53935),
@@ -48,13 +43,13 @@ fun PowerTimingMeter(
             val outline = 2.dp.toPx()
             val frameRadius = 9.dp.toPx()
             drawRoundRect(
-                color = Color(0xFF172027),
+                color = FoldballColor.Ink,
                 topLeft = Offset(outline, outline),
                 size = Size(size.width - outline * 2, size.height - outline * 2),
                 cornerRadius = CornerRadius(frameRadius),
             )
             drawRoundRect(
-                color = Color.White,
+                color = FoldballColor.Paper,
                 topLeft = Offset(outline, outline),
                 size = Size(size.width - outline * 2, size.height - outline * 2),
                 cornerRadius = CornerRadius(frameRadius),
@@ -87,29 +82,17 @@ fun PowerTimingMeter(
                 lineTo(size.width - 13.dp.toPx(), markerY + 8.dp.toPx())
                 close()
             }
-            drawPath(marker, color = Color(0xFF172027))
-            drawPath(marker, color = Color.Black, style = Stroke(width = 1.4.dp.toPx()))
+            drawPath(marker, color = FoldballColor.Ink)
+            drawPath(marker, color = FoldballColor.Ink, style = Stroke(width = 1.4.dp.toPx()))
             val whiteMarker = Path().apply {
                 moveTo(size.width - 2.dp.toPx(), markerY)
                 lineTo(size.width - 13.dp.toPx(), markerY - 6.dp.toPx())
                 lineTo(size.width - 13.dp.toPx(), markerY + 6.dp.toPx())
                 close()
             }
-            drawPath(whiteMarker, color = Color.White)
+            drawPath(whiteMarker, color = FoldballColor.Paper)
         }
 
-        Text(
-            text = "POWER",
-            modifier = Modifier
-                .padding(top = 3.dp)
-                .rotate(-2f)
-                .background(Color(0xFFFFF7E8), RoundedCornerShape(3.dp))
-                .border(1.dp, Color(0xFFBDB2A2), RoundedCornerShape(3.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-            color = Color(0xFF172027),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = .3.sp,
-        )
+        TapeLabel("Power", Modifier.padding(top = 3.dp), compact = true)
     }
 }

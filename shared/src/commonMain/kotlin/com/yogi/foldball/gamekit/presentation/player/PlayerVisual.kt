@@ -1,4 +1,4 @@
-package com.yogi.foldball.presentation.player
+package com.yogi.foldball.gamekit.presentation.player
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -28,10 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yogi.foldball.core.ui.theme.FoldballColor
 import kotlin.math.PI
 
 /** Shared paper standee renderer. Gameplay position and collision stay outside this visual. */
-enum class PlayerFocusState { INACTIVE, FOCUSED, KICKING }
+enum class PlayerFocusState { INACTIVE, FORMATION, FOCUSED, KICKING }
 enum class PlayerFacing { FRONT, BACK }
 
 @Composable
@@ -46,11 +48,13 @@ fun PaperPlayer(
     impactDirectionX: Float = 0f,
     impactDirectionY: Float = 0f,
     impactStrength: Float = 0f,
+    inactiveAlpha: Float = .78f,
     jerseyColor: Color = PlayerRed,
     number: String = "10",
     name: String = "SATO",
 ) {
     val isFocused = focusState == PlayerFocusState.FOCUSED
+    val isFormation = focusState == PlayerFocusState.FORMATION
     val isKicking = focusState == PlayerFocusState.KICKING
     val isActive = isFocused || isKicking
     val normalizedPower = if (isActive) powerProgress.coerceIn(0f, 1f) else 0f
@@ -66,48 +70,91 @@ fun PaperPlayer(
             val sx = size.width / 512f
             val sy = size.height / 512f
             fun p(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x * sx, y * sy)
-            val castShadow = Path().apply {
-                moveTo(p(119f, 400f).x, p(119f, 400f).y)
-                lineTo(p(390f, 400f).x, p(390f, 400f).y)
-                lineTo(p(502f, 456f).x, p(502f, 456f).y)
-                lineTo(p(233f, 456f).x, p(233f, 456f).y)
-                close()
-            }
-            drawPath(
-                castShadow,
-                Brush.linearGradient(
-                    colors = listOf(Ink.copy(alpha = .30f), Ink.copy(alpha = .17f), Ink.copy(alpha = .02f)),
-                    start = p(250f, 400f),
-                    end = p(502f, 456f),
-                ),
+            // Flatten and shear the full standee silhouette onto the grass, anchored
+            // at the feet like the match-screen reference.
+            fun shadowPoint(x: Float, y: Float) = p(
+                x + (408f - y) * .35f,
+                408f + (408f - y) * .30f,
             )
-            val contactShadow = Path().apply {
-                moveTo(p(122f, 399f).x, p(122f, 399f).y)
-                lineTo(p(390f, 399f).x, p(390f, 399f).y)
-                lineTo(p(421f, 418f).x, p(421f, 418f).y)
-                lineTo(p(148f, 418f).x, p(148f, 418f).y)
+            val shadow = Path().apply {
+                if (facing == PlayerFacing.FRONT) {
+                    moveTo(shadowPoint(92f, 392f).x, shadowPoint(92f, 392f).y)
+                    lineTo(shadowPoint(170f, 92f).x, shadowPoint(170f, 92f).y)
+                    lineTo(shadowPoint(352f, 92f).x, shadowPoint(352f, 92f).y)
+                    lineTo(shadowPoint(420f, 392f).x, shadowPoint(420f, 392f).y)
+                    lineTo(shadowPoint(390f, 408f).x, shadowPoint(390f, 408f).y)
+                    lineTo(shadowPoint(122f, 408f).x, shadowPoint(122f, 408f).y)
+                    close()
+                    moveTo(shadowPoint(160f, 90f).x, shadowPoint(160f, 90f).y)
+                    lineTo(shadowPoint(352f, 90f).x, shadowPoint(352f, 90f).y)
+                    lineTo(shadowPoint(390f, 408f).x, shadowPoint(390f, 408f).y)
+                    lineTo(shadowPoint(122f, 408f).x, shadowPoint(122f, 408f).y)
+                } else {
+                    moveTo(shadowPoint(150f, 110f).x, shadowPoint(150f, 110f).y)
+                    lineTo(shadowPoint(362f, 110f).x, shadowPoint(362f, 110f).y)
+                    lineTo(shadowPoint(410f, 408f).x, shadowPoint(410f, 408f).y)
+                    lineTo(shadowPoint(102f, 408f).x, shadowPoint(102f, 408f).y)
+                }
                 close()
             }
-            drawPath(contactShadow, Ink.copy(alpha = .18f))
+            drawPath(shadow, FoldballColor.ShadowGrass.copy(alpha = .34f))
+            drawPath(
+                shadow,
+                FoldballColor.ShadowGrass.copy(alpha = .12f),
+                style = Stroke(width = 4.dp.toPx()),
+            )
         }
-        if (isFocused) {
+        if (isFocused || isFormation) {
             Canvas(Modifier.fillMaxSize()) {
-                drawOval(
-                    color = Color(0xFFE94F43).copy(alpha = .12f * focusPulse),
-                    topLeft = androidx.compose.ui.geometry.Offset(size.width * .12f, size.height * .72f),
-                    size = androidx.compose.ui.geometry.Size(size.width * .76f, size.height * .17f),
-                )
-                drawOval(
-                    color = Color(0xFFE94F43).copy(alpha = .34f * focusPulse),
-                    topLeft = androidx.compose.ui.geometry.Offset(size.width * .12f, size.height * .72f),
-                    size = androidx.compose.ui.geometry.Size(size.width * .76f, size.height * .17f),
-                    style = Stroke(width = 2.dp.toPx()),
-                )
+                val focusPad = Path().apply {
+                    moveTo(size.width * .20f, size.height * .72f)
+                    lineTo(size.width * .80f, size.height * .72f)
+                    lineTo(size.width * .72f, size.height * .93f)
+                    lineTo(size.width * .28f, size.height * .93f)
+                    close()
+                }
+                if (isFocused) {
+                    drawPath(
+                        focusPad,
+                        color = FoldballColor.ShadowBrown.copy(alpha = .36f),
+                        style = Stroke(width = 5.dp.toPx()),
+                    )
+                    drawPath(
+                        focusPad,
+                        color = FoldballColor.Tape.copy(alpha = .42f + .16f * focusPulse),
+                    )
+                    drawPath(
+                        focusPad,
+                        color = FoldballColor.Ink.copy(alpha = .82f),
+                        style = Stroke(width = 1.5.dp.toPx()),
+                    )
+                    drawPath(
+                        focusPad,
+                        color = FoldballColor.Tape.copy(alpha = focusPulse),
+                        style = Stroke(
+                            width = 2.5.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+                        ),
+                    )
+                } else {
+                    drawPath(
+                        focusPad,
+                        color = FoldballColor.FieldHighlight.copy(alpha = .24f),
+                    )
+                    drawPath(
+                        focusPad,
+                        color = FoldballColor.FieldHighlight.copy(alpha = .92f),
+                        style = Stroke(
+                            width = 1.7.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+                        ),
+                    )
+                }
             }
         }
         Box(
             Modifier.fillMaxSize()
-                .alpha(if (isActive) 1f - .38f * normalizedPower else .78f)
+                .alpha(if (isActive) 1f - .38f * normalizedPower else inactiveAlpha.coerceIn(0f, 1f))
                 .graphicsLayer {
                     val press = if (isActive) powerPressProgress.coerceIn(0f, 1f) else 0f
                     val impact = impactStrength.coerceIn(0f, 1f)
@@ -149,18 +196,35 @@ fun PaperPlayer(
             val topFold = Path().apply {
                 moveTo(p(190f, 61f).x, p(190f, 61f).y)
                 lineTo(p(322f, 61f).x, p(322f, 61f).y)
-                lineTo(p(352f, 90f).x, p(352f, 90f).y)
-                lineTo(p(160f, 90f).x, p(160f, 90f).y)
+                if (facing == PlayerFacing.FRONT) {
+                    lineTo(p(352f, 90f).x, p(352f, 90f).y)
+                    lineTo(p(160f, 90f).x, p(160f, 90f).y)
+                } else {
+                    // The back panel begins lower than the front panel. Extend
+                    // its fold to that edge so the top does not look detached.
+                    // Extend behind the back panel slightly; the panel is drawn
+                    // over this fold, preventing an antialiased hairline gap.
+                    lineTo(p(362f, 116f).x, p(362f, 116f).y)
+                    lineTo(p(150f, 116f).x, p(150f, 116f).y)
+                }
                 close()
             }
-            drawPath(topFold, if (facing == PlayerFacing.FRONT) Color(0xFFE9E5DA) else Color(0xFFA92F2B))
+            val backPanel = Path().apply {
+                moveTo(p(150f, 110f).x, p(150f, 110f).y)
+                lineTo(p(362f, 110f).x, p(362f, 110f).y)
+                lineTo(p(410f, 408f).x, p(410f, 408f).y)
+                lineTo(p(102f, 408f).x, p(102f, 408f).y)
+                close()
+            }
+            val frontShape = if (facing == PlayerFacing.FRONT) front else backPanel
+            drawPath(topFold, if (facing == PlayerFacing.FRONT) Color(0xFFE9E5DA) else Ink.copy(alpha = .48f))
             drawPath(topFold, Ink, style = Stroke(width = 7f * sx))
             if (facing == PlayerFacing.FRONT) {
                 drawPath(back, Color(0xFFE1E0DC))
                 drawPath(back, Ink, style = Stroke(width = 8f * sx))
             }
-            drawPath(front, Color(0xFFFFFEFA))
-            clipPath(front) {
+            drawPath(frontShape, Color(0xFFFFFEFA))
+            clipPath(frontShape) {
                 drawRect(jerseyColor)
                 drawRect(
                     brush = Brush.verticalGradient(
@@ -184,18 +248,38 @@ fun PaperPlayer(
                     drawLine(Color.White.copy(alpha = .75f), p(190f, 155f), p(322f, 155f), strokeWidth = 5f * sx)
                 }
             }
-            drawPath(front, Ink, style = Stroke(width = 8f * sx))
-            drawLine(Ink.copy(alpha = .42f), p(129f, 408f), p(383f, 408f), strokeWidth = 10f * sx, cap = StrokeCap.Round)
-            drawLine(Color(0xFF77736F), p(160f, 90f), p(352f, 90f), strokeWidth = 4f * sx, cap = StrokeCap.Round)
+            drawPath(frontShape, Ink, style = Stroke(width = 8f * sx))
+            if (facing == PlayerFacing.FRONT) {
+                val vCollar = Path().apply {
+                    moveTo(p(204f, 90f).x, p(204f, 90f).y)
+                    lineTo(p(256f, 150f).x, p(256f, 150f).y)
+                    lineTo(p(308f, 90f).x, p(308f, 90f).y)
+                    close()
+                }
+                drawPath(vCollar, Color(0xFFFFFEFA))
+                drawPath(vCollar, Ink.copy(alpha = .65f), style = Stroke(width = 3f * sx))
+                drawLine(Ink.copy(alpha = .42f), p(129f, 408f), p(383f, 408f), strokeWidth = 10f * sx, cap = StrokeCap.Round)
+            } else {
+                val nape = Path().apply {
+                    moveTo(p(210f, 110f).x, p(210f, 110f).y)
+                    quadraticTo(p(256f, 158f).x, p(256f, 158f).y, p(302f, 110f).x, p(302f, 110f).y)
+                    close()
+                }
+                drawPath(nape, Ink.copy(alpha = .38f))
+            }
+            val foldEdgeY = if (facing == PlayerFacing.FRONT) 90f else 110f
+            val foldEdgeLeft = if (facing == PlayerFacing.FRONT) 160f else 150f
+            val foldEdgeRight = if (facing == PlayerFacing.FRONT) 352f else 362f
+            drawLine(Color(0xFF77736F), p(foldEdgeLeft, foldEdgeY), p(foldEdgeRight, foldEdgeY), strokeWidth = 4f * sx, cap = StrokeCap.Round)
             drawLine(Color.White.copy(alpha = .48f), p(177f, 112f), p(335f, 112f), strokeWidth = 5f * sx, cap = StrokeCap.Round)
         }
         Text(number, Modifier.align(Alignment.TopCenter).offset(y = 65.dp * labelScale), color = Color.White,
             fontSize = 25.sp * labelScale, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, lineHeight = 25.sp * labelScale)
-        Text(name, Modifier.align(Alignment.TopCenter).offset(y = (if (facing == PlayerFacing.BACK) 38.dp else 91.dp) * labelScale), color = Color.White,
+        Text(name, Modifier.align(Alignment.TopCenter).offset(y = 38.dp * labelScale), color = Color.White,
             fontSize = 9.sp * labelScale, fontWeight = FontWeight.ExtraBold, letterSpacing = .8.sp * labelScale, textAlign = TextAlign.Center)
         }
     }
 }
 
-private val Ink = Color(0xFF252831)
-private val PlayerRed = Color(0xFFD94038)
+private val Ink = FoldballColor.Ink
+private val PlayerRed = FoldballColor.TeamRed

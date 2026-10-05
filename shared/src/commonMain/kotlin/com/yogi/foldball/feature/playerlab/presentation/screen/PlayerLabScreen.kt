@@ -1,20 +1,17 @@
-package com.yogi.foldball.feature.playerlab
+package com.yogi.foldball.feature.playerlab.presentation.screen
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.CornerRadius
@@ -26,26 +23,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yogi.foldball.presentation.player.PaperPlayer
-import com.yogi.foldball.presentation.player.PlayerFocusState
-import com.yogi.foldball.presentation.player.PlayerMotionPreset
-import com.yogi.foldball.presentation.player.PlayerMotionState
-import com.yogi.foldball.presentation.player.rememberPlayerMotionState
+import com.yogi.foldball.gamekit.presentation.player.PaperPlayer
+import com.yogi.foldball.gamekit.presentation.player.PlayerFocusState
+import com.yogi.foldball.gamekit.presentation.player.PlayerMotionPreset
+import com.yogi.foldball.gamekit.presentation.player.PlayerMotionState
+import com.yogi.foldball.gamekit.presentation.player.rememberPlayerMotionState
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.FoldballScaffold
+import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperCard
+import com.yogi.foldball.core.ui.theme.PaperChip
+import com.yogi.foldball.core.ui.theme.TapeLabel
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sin
 
 private enum class PlayerDemo(val title: String, val caption: String, val motion: PlayerMotionPreset) {
-    IDLE("Diam", "Idle dan settle", PlayerMotionPreset.IDLE),
-    REPOSITION("Geser", "Reposition", PlayerMotionPreset.REPOSITION),
-    AUTO_MOVE("Ke bola", "Kicker bergerak", PlayerMotionPreset.APPROACH),
-    AIM_LEFT("Bidik kiri", "Aim kiri", PlayerMotionPreset.AIM_LEFT),
-    AIM_RIGHT("Bidik kanan", "Aim kanan", PlayerMotionPreset.AIM_RIGHT),
-    POWER("Power", "Tarik dan tekan", PlayerMotionPreset.POWER),
-    KICK("Tendang", "Spring dan recoil", PlayerMotionPreset.KICK),
-    COLLISION("Benturan", "Kena bola / pemain", PlayerMotionPreset.IMPACT),
+    IDLE("Idle", "Idle and settle", PlayerMotionPreset.IDLE),
+    REPOSITION("Move", "Reposition", PlayerMotionPreset.REPOSITION),
+    AUTO_MOVE("Approach", "Kicker moves to the ball", PlayerMotionPreset.APPROACH),
+    AIM_LEFT("Aim left", "Aim left", PlayerMotionPreset.AIM_LEFT),
+    AIM_RIGHT("Aim right", "Aim right", PlayerMotionPreset.AIM_RIGHT),
+    POWER("Power", "Pull and press", PlayerMotionPreset.POWER),
+    KICK("Kick", "Spring and recoil", PlayerMotionPreset.KICK),
+    COLLISION("Impact", "Ball or player collision", PlayerMotionPreset.IMPACT),
 }
 
 @Composable
@@ -62,42 +66,36 @@ fun PlayerLabScreen() {
         if (!dragging) motion.play(selected.motion)
     }
 
-    Column(
-        Modifier.fillMaxSize().background(Paper).safeDrawingPadding().verticalScroll(rememberScrollState())
+    FoldballScaffold {
+      Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp).padding(top = 20.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+      ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(9.dp).clip(CircleShape).background(Coral))
             Spacer(Modifier.width(8.dp))
-            Text("FOLDBALL  /  PLAYER MOTION", color = MutedInk, fontSize = 11.sp,
-                fontWeight = FontWeight.Bold, letterSpacing = 1.15.sp)
+            Text("FOLDBALL  /  PLAYER MOTION", color = MutedInk, style = FoldballType.Caption)
         }
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text("Bidak kertas,\ngerak pegas.", color = Ink, fontSize = 32.sp, lineHeight = 35.sp,
-                fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
-            Text("Preview animasi player Foldball", color = MutedInk, fontSize = 14.sp)
+            Text("Paper players,\nspring motion.", color = FoldballColor.Ink, style = FoldballType.LargeTitle, lineHeight = 39.sp)
+            Text("Preview Foldball player animations", color = MutedInk, style = FoldballType.Body)
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(PlayerFocusState.FOCUSED to "Aktif / fokus", PlayerFocusState.INACTIVE to "Nonaktif").forEach { (state, label) ->
-                Surface(
+            listOf(PlayerFocusState.FOCUSED to "Active / focused", PlayerFocusState.INACTIVE to "Inactive").forEach { (state, label) ->
+                PaperChip(
+                    text = label,
                     onClick = {
                         focusState = state
                         dragging = false
                         selected = PlayerDemo.IDLE
                         replayKey++
                     },
-                    modifier = Modifier.weight(1f).height(40.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (focusState == state) Ink else Color(0xFFFFFCF7),
-                    contentColor = if (focusState == state) Color.White else Ink,
-                    border = if (focusState == state) null else BorderStroke(1.dp, Color(0xFFE5DED2)),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
+                    contentDescription = "Set player focus to $label",
+                    modifier = Modifier.weight(1f),
+                    selected = focusState == state,
+                )
             }
         }
 
@@ -120,11 +118,11 @@ fun PlayerLabScreen() {
         )
 
         if (focusState == PlayerFocusState.FOCUSED) {
-            Surface(Modifier.fillMaxWidth(), color = Color(0xFFECE5D9), shape = RoundedCornerShape(18.dp)) {
+            PaperCard(Modifier.fillMaxWidth(), ruled = false, tilt = FoldballTilt.StatusPanel) {
                 Column(Modifier.padding(horizontal = 15.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("POWER CHARGE", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
-                        Text("${(motion.powerProgress * 100).toInt()}%", color = Coral, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("POWER CHARGE", color = Ink, style = FoldballType.Caption)
+                        Text("${(motion.powerProgress * 100).toInt()}%", color = Coral, style = FoldballType.Label)
                     }
                     Slider(
                         value = motion.powerProgress,
@@ -132,12 +130,13 @@ fun PlayerLabScreen() {
                         valueRange = 0f..1f,
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Tarik ke bawah untuk charge", Modifier.weight(1f), maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, color = MutedInk, fontSize = 11.sp)
-                        TextButton(
+                        Text("Pull down to charge", Modifier.weight(1f), maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, color = MutedInk, style = FoldballType.Caption)
+                        PaperButton(
+                            text = "Kick",
                             enabled = motion.powerProgress > .01f,
                             onClick = { scope.launch { motion.releaseChargedKick() } },
-                        ) { Text("Tendang") }
+                        )
                     }
                 }
             }
@@ -145,14 +144,15 @@ fun PlayerLabScreen() {
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("ANIMASI PLAYER", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("PLAYER ANIMATION", color = Ink, style = FoldballType.Caption)
                 Spacer(Modifier.width(8.dp)); Text("•", color = Coral, fontSize = 14.sp)
-                Spacer(Modifier.width(6.dp)); Text("nonaktif: geser · fokus: geser kiri/kanan untuk bidik", color = MutedInk, fontSize = 11.sp)
+                Spacer(Modifier.width(6.dp)); Text("inactive: drag · focused: drag left/right to aim", color = MutedInk, style = FoldballType.Caption)
             }
             PlayerDemo.entries.chunked(4).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     row.forEach { demo ->
-                        Surface(
+                        PaperChip(
+                            text = demo.title,
                             onClick = {
                                 dragging = false
                                 focusState = when (demo) {
@@ -164,32 +164,26 @@ fun PlayerLabScreen() {
                                 selected = demo
                                 replayKey++
                             },
-                            modifier = Modifier.weight(1f).height(42.dp), shape = RoundedCornerShape(14.dp),
-                            color = if (selected == demo) Ink else Color(0xFFFFFCF7),
-                            contentColor = if (selected == demo) Color.White else Ink,
-                            border = if (selected == demo) null else BorderStroke(1.dp, Color(0xFFE5DED2)),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(demo.title, Modifier.padding(horizontal = 3.dp), maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis, fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold)
-                            }
-                        }
+                            contentDescription = "Preview ${demo.caption}",
+                            modifier = Modifier.weight(1f),
+                            selected = selected == demo,
+                        )
                     }
                 }
             }
         }
 
-        Surface(Modifier.fillMaxWidth(), color = Color(0xFFECE5D9), shape = RoundedCornerShape(18.dp)) {
+        PaperCard(Modifier.fillMaxWidth(), ruled = false, tilt = FoldballTilt.StatusPanel) {
             Row(Modifier.padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 Text("✦", color = Coral, fontSize = 17.sp)
                 Column {
-                    Text(selected.caption, color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Pivot di kaki · physics/collider tetap", color = MutedInk, fontSize = 11.sp)
+                    Text(selected.caption, color = Ink, style = FoldballType.Label)
+                    Text("Foot pivot · physics and collider unchanged", color = MutedInk, style = FoldballType.Caption)
                 }
             }
         }
+      }
     }
 }
 
@@ -206,15 +200,15 @@ private fun PlayerLabStage(
     onPowerPullEnd: () -> Unit,
     onAimDrag: (Float) -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth().height(336.dp).shadow(3.dp, RoundedCornerShape(28.dp))
-        .clip(RoundedCornerShape(28.dp)).background(Field)) {
+    PaperCard(Modifier.fillMaxWidth().height(336.dp), ruled = false, tilt = FoldballTilt.StatusPanel) {
+      BoxWithConstraints(Modifier.fillMaxSize().clip(com.yogi.foldball.core.ui.theme.FoldballShapes.Card).background(Field)) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height
             val ball = Offset(w * .51f, h * .48f)
-            drawRoundRect(Color(0xFFF1EBE0), Offset(w * .09f, h * .14f), Size(w * .82f, h * .70f), CornerRadius(24.dp.toPx()))
+            drawRoundRect(FoldballColor.FieldHighlight, Offset(w * .09f, h * .14f), Size(w * .82f, h * .70f), CornerRadius(24.dp.toPx()))
             drawRoundRect(FieldLine, Offset(w * .09f, h * .14f), Size(w * .82f, h * .70f), CornerRadius(24.dp.toPx()), style = Stroke(1.2.dp.toPx()))
             drawLine(FieldLine.copy(alpha = .8f), Offset(w * .10f, h * .50f), Offset(w * .90f, h * .50f), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 6.dp.toPx())))
-            drawCircle(Color(0xFFF9F6F0), h * .125f, Offset(w * .5f, h * .5f))
+            drawCircle(FoldballColor.BallHighlight, h * .125f, Offset(w * .5f, h * .5f))
             drawCircle(FieldLine.copy(alpha = .7f), h * .125f, Offset(w * .5f, h * .5f), style = Stroke(1.dp.toPx()))
             if (focusState == PlayerFocusState.FOCUSED || selected in listOf(PlayerDemo.AIM_LEFT, PlayerDemo.AIM_RIGHT, PlayerDemo.POWER) || motion.powerProgress > .01f) {
                 val angle = motion.shotAngle
@@ -227,7 +221,7 @@ private fun PlayerLabStage(
         val px = maxWidth * .51f + motion.offsetX.dp
         val py = maxHeight * .48f + 104.dp + motion.offsetY.dp
         Canvas(Modifier.offset(px - 53.dp, py - 10.dp).size(106.dp, 19.dp)) {
-            drawOval(Color(0xFF51483D).copy(alpha = .18f))
+            drawOval(FoldballColor.ShadowBrown.copy(alpha = .18f))
         }
         PaperPlayer(
             modifier = Modifier.offset(
@@ -304,18 +298,15 @@ private fun PlayerLabStage(
             }
             drawPath(pentagon, Ink)
         }
-        Surface(Modifier.align(Alignment.TopStart).padding(15.dp), color = Color(0xFFFFFCF7), shape = RoundedCornerShape(50)) {
-            Text(selected.title.uppercase(), Modifier.padding(horizontal = 11.dp, vertical = 7.dp), color = Ink,
-                fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
-        }
+        TapeLabel(selected.title, Modifier.align(Alignment.TopStart).padding(15.dp))
         Text("CHARGE  •  SNAP  •  SETTLE", Modifier.align(Alignment.BottomCenter).padding(bottom = 13.dp),
-            color = MutedInk, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            color = MutedInk, style = FoldballType.Caption)
+      }
     }
 }
 
-private val Paper = Color(0xFFF5F0E6)
-private val Ink = Color(0xFF24314A)
-private val MutedInk = Color(0xFF777A80)
-private val Coral = Color(0xFFE94F43)
-private val Field = Color(0xFFE8E1D4)
-private val FieldLine = Color(0xFFC7BFAF)
+private val Ink = com.yogi.foldball.core.ui.theme.FoldballColor.Ink
+private val MutedInk = com.yogi.foldball.core.ui.theme.FoldballColor.InkMuted
+private val Coral = com.yogi.foldball.core.ui.theme.FoldballColor.TeamRed
+private val Field = com.yogi.foldball.core.ui.theme.FoldballColor.FieldPaper
+private val FieldLine = com.yogi.foldball.core.ui.theme.FoldballColor.FieldLine

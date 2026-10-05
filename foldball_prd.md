@@ -280,13 +280,13 @@ Status Active/Focused dimulai ketika nearest player dipilih dan berakhir setelah
 
 ## 13. Formation Phase
 
-Sebelum tendangan, tim yang tidak menendang mendapat **10 detik** untuk mengatur maksimal dua pemain **Inactive**. Tombol Selesai dapat mengakhiri fase ini lebih awal. Undo hanya tersedia selama waktu bertahan. Setelah itu tim penendang mendapat **8 detik** untuk aim dan menendang. Kedua countdown berhenti saat pertandingan dijeda. Angka 10/8 detik adalah nilai awal `MatchTimingConfig` per pertandingan; pengaturan durasi di masa depan mengisi config sebelum match dimulai.
+Sebelum tendangan pada giliran biasa, tim yang tidak menendang mendapat **10 detik** untuk mengatur maksimal dua pemain **Inactive**. Tombol Selesai dapat mengakhiri fase ini lebih awal. Undo hanya tersedia selama waktu bertahan. Setelah itu tim penendang mendapat **8 detik** untuk aim dan menendang. Pada formasi kickoff pembuka, tim bertahan boleh memindah pemain tetapi hanya di setengah lapangannya sendiri sampai bola dilepas. Kedua countdown berhenti saat pertandingan dijeda. Angka 10/8 detik adalah nilai awal `MatchTimingConfig` per pertandingan; pengaturan durasi di masa depan mengisi config sebelum match dimulai.
 
 Player **Active/Focused** tidak dapat direposition oleh user. Sistem menempatkannya otomatis di belakang bola. Saat user mulai drag untuk membidik, meter power mulai bergerak bolak-balik. Posisi gameplay dan collider tetap di tempat. Saat release, nilai meter saat itu menentukan power; bidak snap ke depan dan sedikit overshoot lalu settle, sementara bola mulai bergerak tepat ketika snap dimulai.
 
 Maksimal dua pemain Inactive dari tim bertahan dapat di-drag selama Formation Phase.
 
-Jika waktu menyerang habis tanpa tendangan, bola tetap di posisi terakhir. Penendang lama mundur dari bola terlebih dahulu, lalu pemain tim bertahan yang paling dekat dengan bola bergerak ke belakang bola sebagai penendang baru. Countdown giliran baru dimulai setelah animasi pendekatan selesai.
+Jika countdown menyerang habis saat power sudah terisi, sistem melepas tendangan otomatis memakai power terakhir yang terisi. Jika belum ada power yang terisi, bola tetap di posisi terakhir; penendang lama mundur dari bola terlebih dahulu, lalu pemain tim bertahan yang paling dekat dengan bola bergerak ke belakang bola sebagai penendang baru. Countdown giliran baru dimulai setelah animasi pendekatan selesai.
 
 Tujuannya:
 
@@ -324,9 +324,9 @@ Susunan awal mengikuti zona masing-masing tim. Posisi gameplay pemain berada di 
 
 Sebelum tim penendang menembak, tim bertahan boleh mereposisi **maksimal dua pemain berbeda**. Setiap pemain dapat berpindah maksimal **satu zona** ke salah satu dari delapan zona tetangga (horizontal, vertikal, atau diagonal), atau tetap di zona asal. Pemain dapat pindah ke zona mana pun di grid; tidak ada batas zona berdasarkan peran.
 
-Zona tujuan legal jika kosong dari **semua pemain lain**, baik teman maupun lawan. Saat diseret, pemain mengikuti jari di dalam zona asal atau zona tetangga yang legal; posisinya tidak snap ke tengah zona. Gerakan berhenti pada titik legal terakhir bila mencapai zona ilegal, tepi lapangan, bola, atau pemain lain. Setelah pemain dipindahkan dan dilepas, satu jatah reposisi terpakai meskipun ia tetap di zona asal. Tombol Undo mengembalikan perpindahan terakhir beserta jatahnya dan dapat dipakai berulang hingga semua perpindahan dibatalkan; Undo tidak tersedia setelah tendangan. Garis grid tidak tampil sebelum tendangan. Hanya saat pemain diseret, zona yang legal disorot secara halus dan sorotan dibatasi di dalam garis tepi lapangan.
+Zona tujuan legal jika kosong dari **semua pemain lain**, baik teman maupun lawan, memiliki titik yang aman dari bola, pemain lain, dan tepi lapangan, serta dapat dicapai lewat lintasan drag yang aman. Pilih satu pemain untuk melihat zona tetangga yang legal dengan garis tepi putus-putus; jangan gabungkan tujuan dari beberapa pemain atau menggambar garis penghubung. Pemain mengikuti jari di dalam zona asal atau zona tetangga yang legal. Jika pusat zona terhalang tetapi tepinya aman, drag ke zona tersebut menempatkan pemain di titik aman itu. Gerakan berhenti pada titik legal terakhir bila mencapai zona ilegal, tepi lapangan, bola, atau pemain lain. Pemain yang sudah bergerak tidak dapat dipindahkan lagi pada giliran itu. Setelah pemain dipindahkan dan dilepas, satu jatah reposisi terpakai. Tombol Undo mengembalikan perpindahan terakhir beserta jatahnya dan dapat dipakai berulang hingga semua perpindahan dibatalkan; Undo tidak tersedia setelah tendangan.
 
-Benturan bola tetap menggerakkan pemain secara halus melalui physics; perpindahan karena benturan tetap dibatasi oleh radius dari posisi terakhir yang ditetapkan. MVP dimulai dengan 4 pemain per tim. Rekomendasi batas atas roster untuk lapangan 18 zona adalah 6 pemain per tim.
+Benturan bola tetap menggerakkan pemain secara halus melalui physics; perpindahan karena benturan tetap dibatasi oleh radius dari posisi terakhir yang ditetapkan. Jarak antar badan pemain dijaga saat benturan dan pendekatan penendang agar bidak tidak saling menumpuk. MVP dimulai dengan 4 pemain per tim. Rekomendasi batas atas roster untuk lapangan 18 zona adalah 6 pemain per tim.
 
 ---
 
@@ -1272,7 +1272,7 @@ whenPhysicsStopped():
     startFormationPhase()
 ```
 
-Selama Formation Phase 10 detik, maksimal dua player Inactive dari tim bertahan dapat di-reposition; perpindahan terakhir dapat di-undo atau fase diakhiri dengan Selesai. Kicker Active/Focused terkunci di belakang bola. Saat masuk Aiming 8 detik, drag horizontal pada kicker mengubah `kickerAimAngle` tanpa mengubah posisi fisiknya. Timeout menyerang menyerahkan bola di tempat kepada pemain bertahan terdekat setelah penendang lama mundur.
+Selama Formation Phase 10 detik, maksimal dua player Inactive dari tim bertahan dapat di-reposition; perpindahan terakhir dapat di-undo atau fase diakhiri dengan Selesai. Kicker Active/Focused terkunci di belakang bola. Saat masuk Aiming 8 detik, drag horizontal pada kicker mengubah `kickerAimAngle` tanpa mengubah posisi fisiknya. Jika countdown berakhir dengan power terisi, tendangan otomatis dilepas memakai power terakhir; jika belum ada power, bola tetap di tempat dan giliran diserahkan kepada pemain bertahan terdekat setelah penendang lama mundur.
 
 Opening Toss:
 

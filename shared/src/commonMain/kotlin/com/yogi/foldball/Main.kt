@@ -7,29 +7,31 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.yogi.foldball.feature.balllab.BallLabScreen
-import com.yogi.foldball.feature.home.HomeScreen
-import com.yogi.foldball.feature.match.FullMatchScreen
-import com.yogi.foldball.feature.match.MatchSandboxScreen
-import com.yogi.foldball.feature.playerlab.PlayerLabScreen
+import com.yogi.foldball.feature.balllab.presentation.screen.BallLabScreen
+import com.yogi.foldball.feature.home.presentation.screen.HomeScreen
+import com.yogi.foldball.feature.match.presentation.screen.FullMatchScreen
+import com.yogi.foldball.feature.match.presentation.screen.MatchSandboxScreen
+import com.yogi.foldball.feature.playerlab.presentation.screen.PlayerLabScreen
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballTheme
+import com.yogi.foldball.core.ui.theme.FoldballSnackbarHost
+import com.yogi.foldball.core.ui.theme.LocalFoldballSnackbarHostState
+import com.yogi.foldball.core.ui.theme.PaperChip
 
 /** Product entry point: start at Home, then enter Match or Sandbox. */
 @Composable
@@ -46,31 +48,44 @@ fun SandboxMain() {
 
 @Composable
 private fun FoldballRoot(startAtHome: Boolean) {
-    MaterialTheme {
+    FoldballTheme {
         var route by remember { mutableStateOf(if (startAtHome) "home" else "sandbox") }
         var sandboxTab by remember { mutableStateOf("movement") }
-        Surface(Modifier.fillMaxSize().safeDrawingPadding(), color = Color(0xFFF5F0E6)) {
-            when (route) {
-                "match" -> FullMatchScreen { destination ->
-                    if (destination == "home") {
-                        route = "home"
+        val snackbarHostState = remember { SnackbarHostState() }
+        Surface(Modifier.fillMaxSize(), color = FoldballColor.Wood) {
+            CompositionLocalProvider(LocalFoldballSnackbarHostState provides snackbarHostState) {
+                Box(Modifier.fillMaxSize()) {
+                    if (route == "match") {
+                        FullMatchScreen { destination ->
+                            if (destination == "home") route = "home" else {
+                                sandboxTab = destination
+                                route = "sandbox"
+                            }
+                        }
                     } else {
-                        sandboxTab = destination
-                        route = "sandbox"
+                        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                            when (route) {
+                                "sandbox" -> SandboxContent(
+                                    selectedTab = sandboxTab,
+                                    onSelectTab = { sandboxTab = it },
+                                    onHomeClick = { route = "home" },
+                                )
+                                else -> HomeScreen(
+                                    onMatchClick = { route = "match" },
+                                    onSandboxClick = {
+                                        sandboxTab = "movement"
+                                        route = "sandbox"
+                                    },
+                                )
+                            }
+                        }
                     }
+                    FoldballSnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .navigationBarsPadding().padding(bottom = 12.dp),
+                    )
                 }
-                "sandbox" -> SandboxContent(
-                    selectedTab = sandboxTab,
-                    onSelectTab = { sandboxTab = it },
-                    onHomeClick = { route = "home" },
-                )
-                else -> HomeScreen(
-                    onMatchClick = { route = "match" },
-                    onSandboxClick = {
-                        sandboxTab = "movement"
-                        route = "sandbox"
-                    },
-                )
             }
         }
     }
@@ -82,7 +97,7 @@ private fun SandboxContent(
     onSelectTab: (String) -> Unit,
     onHomeClick: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().background(Color(0xFFF5F0E6))) {
+    Column(Modifier.fillMaxSize().background(FoldballColor.Wood)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -93,20 +108,13 @@ private fun SandboxContent(
                 "ball" to "Ball Lab",
                 "player" to "Player Lab",
             ).forEach { (tab, title) ->
-                Surface(
+                PaperChip(
+                    text = title,
                     onClick = { if (tab == "home") onHomeClick() else onSelectTab(tab) },
-                    modifier = Modifier.weight(1f).height(38.dp),
-                    color = if (selectedTab == tab) Color(0xFF24314A) else Color(0xFFFFFCF7),
-                    shape = RoundedCornerShape(13.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            title,
-                            color = if (selectedTab == tab) Color.White else Color(0xFF24314A),
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
+                    contentDescription = "Open $title",
+                    modifier = Modifier.weight(1f),
+                    selected = selectedTab == tab,
+                )
             }
         }
         Box(Modifier.weight(1f)) {

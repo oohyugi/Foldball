@@ -1,421 +1,162 @@
-[Foundations](#foundations) [Shared components](#components) [Theme setup](#theme)
-
 # Foldball Design System
 
-Semua layar Foldball dibangun dari satu meja belajar: kayu sebagai alas, kertas sobek sebagai permukaan, tinta bolpoin sebagai teks, selotip kuning untuk penekanan. Halaman ini berisi token dan komponen shared untuk Jetpack Compose.
+This document is the source of truth for Foldball's visual language and shared UI. Read it before proposing or implementing any UI change. The design system lives in the existing `:shared` module; there is no separate `core:designsystem` Gradle module.
 
-**Kertas di atas kayu**Setiap kontrol adalah selembar kertas atau potongan selotip di atas meja.
+## 1. Art Direction
 
-**Miring sedikit**Rotasi tiap elemen berbeda tipis. Jangan pernah 0 derajat untuk kartu.
+Foldball should feel like a paper football game played on a school desk:
 
-**Bayangan keras**Offset ke bawah, tanpa blur besar. Seperti kertas yang ditempel, bukan melayang.
+- Warm wood is the background surface.
+- Torn paper is used for cards, buttons, score panels, and dialogs.
+- Dark ink carries text, outlines, and icon strokes.
+- Yellow tape highlights important labels and the current selection.
+- Cardboard and green paper support the arena materials.
+- Small changes in angle and a firm downward shadow make paper elements feel placed on a surface.
 
-## Foundations
+Keep gameplay readable. Texture, grain, rotation, and decoration must not obscure scores, timers, instructions, or touch targets. Styling work must preserve field geometry, gesture areas, physics, and player hitboxes.
+
+## 2. Source Locations
+
+All shared UI is implemented in `shared`:
+
+| Responsibility | Location |
+| --- | --- |
+| Color, typography, spacing, and Material theme | `shared/src/commonMain/kotlin/com/yogi/foldball/core/ui/theme/FoldballTokens.kt` |
+| Paper shapes and reusable UI components | `shared/src/commonMain/kotlin/com/yogi/foldball/core/ui/theme/FoldballComponents.kt` |
+| Bundled fonts | `shared/src/commonMain/composeResources/font/` |
+| Runtime images and vectors | `shared/src/commonMain/composeResources/drawable/` |
+| Shared ball, field, and player rendering | `shared/src/commonMain/kotlin/com/yogi/foldball/gamekit/presentation/` |
+| Match-specific UI composition | `shared/src/commonMain/kotlin/com/yogi/foldball/feature/match/presentation/` |
+
+Keep original/source material in `referensi_assets/`. Copy only assets used at runtime into Compose Resources. The Markdown file is the authoritative guideline; the HTML file is a visual companion.
+
+## 3. Foundations
 
 ### Color
 
-**Wood**#9A6A3C, alas semua layar
+Use `FoldballColor` instead of defining screen-local equivalents.
 
-**WoodDark**#6F4524, serat & bayangan
+| Token | Hex | Intended use |
+| --- | --- | --- |
+| `Wood` | `#9A6A3C` | Main desk surface |
+| `WoodDark` | `#6F4524` | Wood grain and dark material details |
+| `Paper` | `#F6F1E4` | Paper surfaces and light text on ink |
+| `PaperLine` | `#C9D4EA` | Ruled paper lines |
+| `Ink` | `#1C1C22` | Text, outlines, and dark controls |
+| `InkBlue` | `#1F4FC4` | Primary action and blue team |
+| `TeamRed` | `#D64545` | Red team and danger actions |
+| `Tape` | `#F4D34A` | Emphasis, focus, and selection |
+| `Grass` | `#3F8F43` | Green paper/field accents |
+| `Cardboard` | `#C99A62` | Arena walls and cardboard details |
+| `InkMuted` | `#777A80` | Secondary technical labels |
+| `FieldPaper` | `#E8E1D4` | Neutral paper arena used by visual labs |
+| `FieldLine` | `#C7BFAF` | Arena linework |
+| `FieldHighlight` | `#F1EBE0` | Light arena highlights |
+| `BallHighlight` | `#F9F6F0` | Ball and field highlight details |
+| `ShadowBrown` | `#51483D` | Contact shadows in presentation previews |
+| `ShadowGrass` | `#0B2A0E` | Projected player silhouettes on the field |
+| `Shadow` | `#352213` | Paper shadow base color; opacity comes from `FoldballShadow` |
+| `ShadowBlue` | `#173C94` | Primary action shadow |
 
-**Paper**#F6F1E4, kartu & dialog
-
-**PaperLine**#C9D4EA, garis buku tulis
-
-**Ink**#1C1C22, teks & outline
-
-**InkBlue**#1F4FC4, aksi utama, tim biru
-
-**TeamRed**#D64545, tim merah, bahaya
-
-**Tape**#F4D34A, label & fokus
-
-**Grass**#3F8F43, lapangan
-
-**Cardboard**#C99A62, pinggir arena
+Add a semantic token when a recurring material or state cannot be represented by these values. Record it here and in `FoldballTokens.kt` together.
 
 ### Typography
 
-| Style | Contoh | Font | Spec |
+Use the local Compose Resource fonts. Do not fetch fonts at runtime or use an Android-only Google Fonts provider in `commonMain`.
+
+| Style | Typeface | Size and treatment | Use |
 | --- | --- | --- | --- |
-| display | FoldBall | Permanent Marker | 58sp, spacing -1 |
-| title | PLAY | Permanent Marker | 40sp / 26sp |
-| label | Team | Patrick Hand | 20sp, caps, +0.06em |
-| body | Flick the ball into the goal | Patrick Hand | 17sp, line 24sp |
-| caption | Paper football game | Patrick Hand | 14sp, caps, +0.08em |
+| Display | Permanent Marker | 58sp, letter spacing -1sp | Product name and opening hero |
+| Large title | Permanent Marker | 40sp | Major celebration or title |
+| Title | Permanent Marker | 26sp | Primary actions and panel headings |
+| Label | Patrick Hand | 20sp, uppercase, about 0.06em tracking | Team names and section labels |
+| Body | Patrick Hand | 17sp, 24sp line height | Instructions and dialog copy |
+| Caption | Patrick Hand | 14sp, uppercase, about 0.08em tracking | Short metadata and secondary labels |
 
-### Spacing, rotation, elevation
+Use `FoldballType`. Smaller variants may be used in the match HUD when space is constrained, while preserving the same font family and readable contrast.
 
-xs 4dp
+### Spacing, rotation, and shadows
 
-sm 8dp
+Use `FoldballSpace` for shared spacing: `xs` 4dp, `sm` 8dp, `md` 12dp, `lg` 16dp, and `xl` 24dp. Use `FoldballTilt` for recurring paper rotations and `FoldballShadow` for paper shadow offset, opacity, and colors. A local size is acceptable for a one-off alignment detail; recurring values belong in tokens.
 
-md 12dp
+- Banner tilt: -1.6 degrees.
+- Menu card tilts, reading left to right and top to bottom: +1.0, -1.2, -0.8, +1.3 degrees.
+- Paper shadow: `FoldballShadow.offsetY` (4dp) and `FoldballShadow.paperOpacity` (45%), with no large blur.
+- Primary action shadow: `FoldballShadow.offsetY` (4dp) and `FoldballShadow.primaryColor`, with no blur.
+- Pressed state: scale to 0.97 over 120ms.
+- Interactive target: at least 48dp in both dimensions. A smaller icon may sit inside a larger target.
 
-lg 16dp
-
-xl 24dp
-
-| Token | Nilai | Dipakai untuk |
-| --- | --- | --- |
-| Tilt.Banner | -1.6° | Banner judul |
-| Tilt.Cards | +1.0° / -1.2° / -0.8° / +1.3° | Grid menu, urut kiri-kanan, atas-bawah |
-| Shadow.Soft | y 4dp, alpha 45% | Kartu, chip, banner |
-| Shadow.Hard | y 4dp, tanpa blur, biru tua | Tombol PLAY dan tombol utama |
-| Touch target | min 48dp | Semua yang bisa ditekan |
-| Press scale | 0.97, 120ms | Tombol dan kartu saat ditekan |
+Centralize recurring tilt and shadow values rather than scattering magic numbers across screens.
 
 ### Torn paper shapes
 
-Empat bentuk sobekan, semuanya poligon dengan titik pecahan 0..1 sehingga ukurannya fleksibel. Di Compose dipakai lewat satu fungsi `tornShape`.
+Use `FoldballShapes.Card`, `Button`, `Chip`, and `Banner` for Foldball paper surfaces. They are normalized polygons and should scale with their component. Do not substitute rounded Material surfaces for paper components when an existing Foldball component fits.
 
-CardShape
+Cards and banners must have a small, non-zero tilt. Keep the rotation modest enough to avoid clipped content or reduced touch targets.
 
-ButtonShape
+## 4. Shared Components
 
-ChipShape
+Use the shared components before writing screen-local `Box`, `clip`, shadow, or click behavior.
 
-BannerShape
+| Component | Purpose and usage |
+| --- | --- |
+| `FoldballTheme` | Applies the light Material color scheme and Foldball theme to the app. |
+| `FoldballScaffold` | Draws the wood gradient and grain and provides the common screen content frame. Home and Sandbox receive safe drawing insets from the app root. The full-screen Match route can draw behind transparent system bars and applies insets to its interactive content. Do not apply a second inset inside nested screens. |
+| `PaperCard` | Torn-paper base for cards, banners, and dialog surfaces. Set a non-zero tilt. Use ruled lines for notebook-like content and disable them for clean display surfaces. |
+| `PaperButton` | Primary, secondary, danger, and disabled actions. Primary actions use the hard blue shadow. Use `compact = true` for dense bars; it keeps a 48dp minimum touch target with a 20sp label and reduced horizontal padding. |
+| `PaperIconButton` | Icon-only action with an accessible description and a minimum 48dp target. |
+| `PaperChip` | Text action or selection chip. Provide a useful content description and selection state. |
+| `TapeLabel` | Short emphasis label on yellow tape. Use sparingly. Use `compact = true` for narrow controls such as the power meter label so text stays on one line. |
+| `MenuCard` | Large menu tile with a title and optional art. Locked cards are disabled, described as locked to assistive technology, and covered by a dark visual overlay. |
+| `PaperToggle` | Settings switch styled as a hand-drawn checkbox. Keep the full row interactive. |
+| `CirclePickerItem` | Team or ball picker item. Show selected state with the blue hand-drawn oval and expose selection semantics. |
+| `PaperDialog` | Confirmation and result dialog on a torn banner. Use secondary action for cancel and danger style for destructive confirmation. |
+| `InkToast` | Short-lived feedback on an ink-colored chip. `FoldballSnackbarHost` renders Material `SnackbarHost` messages with this component at the app root. UI can use `LocalFoldballSnackbarHostState.current.showSnackbar(...)` to send a message. |
 
-```
-fun tornShape(vararg p: Pair<Float, Float>) = GenericShape { size, _ ->
-    p.forEachIndexed { i, (x, y) ->
-        val px = x * size.width
-        val py = y * size.height
-        if (i == 0) moveTo(px, py) else lineTo(px, py)
-    }
-    close()
-}
+`PressableSurface` is the shared base for interactive paper surfaces. Keep press scale, clipping, shadow, enabled state, role, and semantics there so controls behave consistently.
 
-object FoldballShapes {
-    val Card = tornShape(
-        0f to .04f, .12f to 0f, .36f to .03f, .62f to 0f, .88f to .03f, 1f to .01f,
-        .99f to .38f, 1f to .70f, .98f to 1f, .70f to .97f, .40f to 1f, .14f to .97f,
-        .01f to 1f, .02f to .62f
-    )
-    val Button = tornShape(
-        .01f to .12f, .08f to .03f, .30f to .08f, .52f to .02f, .76f to .07f, .97f to .02f,
-        1f to .30f, .98f to .62f, 1f to .92f, .74f to .97f, .50f to 1f, .26f to .95f,
-        .06f to .99f, 0f to .70f, .02f to .40f
-    )
-    val Chip = tornShape(
-        .04f to .08f, .30f to .02f, .58f to .07f, .96f to .03f, .99f to .40f,
-        .95f to .96f, .60f to 1f, .28f to .94f, .03f to .98f, 0f to .50f
-    )
-    val Banner = tornShape(
-        0f to .06f, .05f to .01f, .14f to .05f, .30f to 0f, .48f to .04f, .66f to 0f,
-        .84f to .04f, .97f to 0f, 1f to .10f, .98f to .40f, 1f to .72f, .96f to .96f,
-        .80f to 1f, .60f to .96f, .42f to 1f, .22f to .95f, .08f to 1f, .01f to .90f, .03f to .55f
-    )
-}
-```
+## 5. Screen and Match Patterns
 
-## Shared components
+- **Home:** Use `FoldballScaffold`, the display type, and a clear primary `PaperButton`. Keep the primary action visually strongest.
+- **Menu grids:** Use `MenuCard` with the documented alternating tilt sequence. Do not invent a new card treatment for each tile.
+- **Match HUD:** Compose `MatchScoreboard`, `MatchStatusPanel`, and `PowerTimingMeter` from shared tokens and paper components. Show team identity with labels as well as color.
+- **Match turn indicators:** Tint the countdown team label with that team's color. Keep bottom actions content-sized and distribute them across the bar; use the compact button variant when space is limited.
+- **Match team emphasis:** Fade the non-turn team smoothly to 68% during formation. Keep both teams fully visible during aiming, kicker approach, and ball movement. Keep the fade subtle enough to preserve jersey and position readability.
+- **Match haptics:** Play one subtle platform haptic when entering a formation or aiming phase, when a player move is accepted, when a kick is released, and when a goal is scored. Do not repeat haptics during timer or animation frames.
+- **Match formation and kick states:** During opening kickoff formation, label the defending team and show that movement stays in its own half. Highlight movable players with a pale dashed base marker; selecting one player shows neighboring zones with a reachable, collision-safe drag path in a subtle team-color fill and bright dashed outline, and blocked neighboring zones with a subtle gray fill and outline. Dragging into a highlighted zone may settle on its safe edge when the center is obstructed. Leave non-neighboring zones unmarked and draw no connector lines. During later formation turns, use the same marker and zone treatment. Reserve the yellow tape focus marker for the active kicker.
+- **Gameplay shadows:** Keep player cast shadows anchored to the standee's bottom edge so the player reads as touching the field. Place the ball contact shadow immediately below the ball; let it become wider and softer as the ball rises, while the contact mark fades.
+- **Match arena sizing:** Keep field width and height independent of phase-specific labels, status panels, and actions. Reserve consistent space for match controls so changing a bottom action never resizes the field or resets its coordinate system.
+- **Opening toss and goal celebration:** Use a torn `PaperCard` or `Banner` and the same team colors and type scale as the HUD.
+- **Arena:** Preserve the classroom desk, paper field, and cardboard materials. Use shared material tokens for newly drawn colors; do not change playable bounds to make a visual treatment fit.
+- **Dialogs and feedback:** Use `PaperDialog` for confirmation/results and the shared ink toast treatment for transient feedback.
+- **Settings and selection:** Use `PaperToggle` and `CirclePickerItem` when those flows are introduced.
+- **Developer labs:** They are reachable through Sandbox today. Keep their controls aligned with this system if they remain accessible from the player-facing app.
 
-Semua composable ini ada di modul `core:designsystem` dan dipakai ulang oleh menu, pemilihan tim, arena, dan layar pertandingan. Layar tidak boleh membuat Box + clip sendiri.
+A component receives display data, accessibility text, and callbacks from its owner. It must not decide gameplay rules or navigation destinations.
 
-### FoldballScaffold
+## 6. Accessibility and Layout
 
-`layar apa pun`
+- Give every interactive control a minimum 48dp hit area, even when the visible icon is smaller.
+- Supply meaningful content descriptions for icon-only actions.
+- Expose selected, disabled, and locked states through semantics as well as appearance.
+- Do not communicate team or action state by color alone; include text or an accessible label.
+- Keep text at the defined sizes where space allows. When a compact HUD needs smaller type, preserve the bundled face and verify legibility at narrow portrait widths.
+- Keep Home and Sandbox status-bar/navigation-bar insets at the app root. The full-screen Match route may draw behind transparent bars and must inset interactive content at its route root. Avoid double inset padding in nested screens.
+- Decorative grain and ruled lines stay behind content and must not reduce text contrast.
 
-Alas kayu untuk setiap layar. Menggambar serat lewat `drawBehind` dan menangani insets sistem.
+## 7. UI Implementation Workflow
 
-```
-@Composable
-fun FoldballScaffold(
-    modifier: Modifier = Modifier,
-    topBar: @Composable () -> Unit = {},
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFFA87647), Wood, Color(0xFFA06E40))))
-            .drawBehind { drawWoodGrain(WoodDark.copy(alpha = .10f), spacing = 9.dp.toPx()) }
-            .systemBarsPadding()
-            .padding(horizontal = 14.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            topBar()
-            content()
-        }
-    }
-}
-```
+For every task that creates or changes UI:
 
-### PaperCard
+1. Read this guide before editing UI source.
+2. Identify the existing token or component that matches the requested surface or interaction.
+3. Reuse it and keep screen code focused on composition, state display, and callbacks.
+4. If the design calls for a new reusable rule, update this guide and the shared component/token implementation in the same change.
+5. Review affected screens at narrow portrait dimensions and check touch bounds, text clipping, rotation, and contrast.
+6. Preserve gameplay geometry, gesture handling, and engine behavior while making visual changes.
 
-`base surface`
+## 8. Theme Setup
 
-Surface dasar untuk kartu, banner, dan dialog.
+The product uses a single light visual mode. The desk-and-paper materials define the game's identity, so do not add a dark theme without an explicit product decision.
 
-```
-@Composable
-fun PaperCard(
-    modifier: Modifier = Modifier,
-    shape: Shape = FoldballShapes.Card,
-    tilt: Float = 0f,
-    ruled: Boolean = true,
-    content: @Composable BoxScope.() -> Unit
-) = Box(
-    modifier
-        .rotate(tilt)
-        .softShadow(shape)
-        .clip(shape)
-        .background(Paper)
-        .then(if (ruled) Modifier.drawBehind { drawRuledLines(PaperLine, 22.dp.toPx()) } else Modifier),
-    content = content
-)
-```
-
-### PaperChip
-
-`icon button`
-
-```
-@Composable
-fun PaperChip(
-    icon: Painter,
-    contentDescription: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) = PressableSurface(
-    onClick = onClick,
-    shape = FoldballShapes.Chip,
-    modifier = modifier.size(48.dp)
-) {
-    Icon(icon, contentDescription, Modifier.size(28.dp).align(Alignment.Center), tint = Ink)
-}
-```
-
-### PaperButton
-
-`primary / secondary / danger / disabled`
-
-```
-enum class PaperButtonStyle(val container: Color, val content: Color) {
-    Primary(InkBlue, Color.White),
-    Secondary(Paper, Ink),
-    Danger(TeamRed, Color.White)
-}
-
-@Composable
-fun PaperButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    style: PaperButtonStyle = PaperButtonStyle.Primary,
-    enabled: Boolean = true,
-    leading: (@Composable () -> Unit)? = null
-) = PressableSurface(
-    onClick = onClick,
-    enabled = enabled,
-    shape = FoldballShapes.Button,
-    color = if (enabled) style.container else Color(0xFFB9B2A2),
-    shadow = if (style == PaperButtonStyle.Primary) ShadowStyle.Hard else ShadowStyle.Soft,
-    modifier = modifier.heightIn(min = 52.dp)
-) {
-    Row(Modifier.padding(horizontal = 26.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        leading?.invoke()
-        Text(text, style = FoldballType.Title, color = if (enabled) style.content else Color(0xFF6D675B))
-    }
-}
-
-// PressableSurface: scale 0.97 saat pressed, spring 120ms
-@Composable
-fun PressableSurface(onClick: () -> Unit, shape: Shape, modifier: Modifier = Modifier,
-                     enabled: Boolean = true, color: Color = Paper,
-                     shadow: ShadowStyle = ShadowStyle.Soft, content: @Composable BoxScope.() -> Unit) {
-    val src = remember { MutableInteractionSource() }
-    val pressed by src.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(120))
-    Box(
-        modifier.scale(scale).shadowFor(shadow, shape).clip(shape).background(color)
-            .clickable(src, null, enabled = enabled, onClick = onClick),
-        content = content
-    )
-}
-```
-
-### TapeLabel
-
-`penekanan`
-
-Paper football gameNew
-
-```
-@Composable
-fun TapeLabel(text: String, modifier: Modifier = Modifier, color: Color = Tape,
-              contentColor: Color = Ink) =
-    Text(
-        text.uppercase(), style = FoldballType.Caption, color = contentColor,
-        modifier = modifier.rotate(-1f).background(color).padding(horizontal = 14.dp, vertical = 2.dp)
-    )
-```
-
-### MenuCard
-
-`grid menu`
-
-```
-@Composable
-fun MenuCard(
-    title: String,
-    tilt: Float,
-    locked: Boolean = false,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    art: @Composable RowScope.() -> Unit
-) = PressableSurface(
-    onClick = onClick, enabled = !locked, shape = FoldballShapes.Card,
-    modifier = modifier.rotate(tilt).heightIn(min = 118.dp).semantics { if (locked) stateDescription = "Locked" }
-) {
-    Column(Modifier.padding(start = 18.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
-           horizontalAlignment = Alignment.CenterHorizontally,
-           verticalArrangement = Arrangement.SpaceBetween) {
-        Text(title.uppercase(), style = FoldballType.Label, color = Ink)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), content = art)
-    }
-    if (locked) Box(Modifier.matchParentSize().background(Color(0x733C3732)))
-}
-```
-
-### PaperToggle
-
-`pengaturan`
-
-```
-@Composable
-fun PaperToggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) =
-    Row(
-        Modifier.toggleable(checked, role = Role.Switch, onValueChange = onChange).minimumInteractiveComponentSize(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Canvas(Modifier.size(30.dp)) {
-            drawRoundRect(Ink, style = Stroke(3.dp.toPx()), cornerRadius = CornerRadius(6.dp.toPx()))
-            if (checked) drawCheckStroke(InkBlue, width = 3.4.dp.toPx())
-        }
-        Text(label, style = FoldballType.Label.copy(letterSpacing = 0.sp), color = Ink)
-    }
-```
-
-### CirclePicker
-
-`pilih tim / bola`
-
-```
-@Composable
-fun CirclePickerItem(selected: Boolean, label: String, onClick: () -> Unit,
-                     content: @Composable BoxScope.() -> Unit) =
-    PressableSurface(onClick, FoldballShapes.Chip, Modifier.size(74.dp).semantics { this.selected = selected; contentDescription = label }) {
-        content()
-        if (selected) Canvas(Modifier.matchParentSize().rotate(-4f).padding(2.dp)) {
-            drawOval(InkBlue, style = Stroke(3.dp.toPx()))   // lingkaran coretan tangan
-        }
-    }
-```
-
-### ScoreBoard
-
-`layar match`
-
-2BLUE
-
-:
-
-1RED
-
-```
-@Composable
-fun ScoreBoard(blue: Int, red: Int, modifier: Modifier = Modifier) =
-    PaperCard(modifier, shape = FoldballShapes.Chip, ruled = false) {
-        Row(Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            ScoreDigit(blue, InkBlue, "BLUE")
-            Text(":", style = FoldballType.Title, color = Ink)
-            ScoreDigit(red, TeamRed, "RED")
-        }
-    }
-```
-
-### PaperDialog & InkToast
-
-`konfirmasi, umpan balik`
-
-#### Quit match?
-
-Skor saat ini tidak akan disimpan.
-
-Team saved
-
-```
-@Composable
-fun PaperDialog(title: String, message: String, onDismiss: () -> Unit,
-                confirmText: String, onConfirm: () -> Unit,
-                dismissText: String = "STAY", danger: Boolean = false) =
-    Dialog(onDismissRequest = onDismiss) {
-        PaperCard(shape = FoldballShapes.Banner, tilt = .6f) {
-            Column(Modifier.padding(22.dp, 26.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                   verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(title, style = FoldballType.Title, color = Ink)
-                Text(message, style = FoldballType.Body, color = Color(0xFF444444), textAlign = TextAlign.Center)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PaperButton(dismissText, onDismiss, style = PaperButtonStyle.Secondary)
-                    PaperButton(confirmText, onConfirm,
-                        style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary)
-                }
-            }
-        }
-    }
-
-// Toast: SnackbarHost dengan container Ink, teks Paper, shape Chip, tilt -0.8f
-```
-
-## Theme setup
-
-Token warna, tipografi, dan spacing dikumpulkan di satu tempat. Tema ini sengaja satu mode saja (tidak ada dark mode), karena meja kayu adalah identitas game.
-
-```
-// designsystem/Color.kt
-val Wood      = Color(0xFF9A6A3C)
-val WoodDark  = Color(0xFF6F4524)
-val Paper     = Color(0xFFF6F1E4)
-val PaperLine = Color(0xFFC9D4EA)
-val Ink       = Color(0xFF1C1C22)
-val InkBlue   = Color(0xFF1F4FC4)
-val TeamRed   = Color(0xFFD64545)
-val Tape      = Color(0xFFF4D34A)
-val Grass     = Color(0xFF3F8F43)
-val Cardboard = Color(0xFFC99A62)
-
-// designsystem/Type.kt  (Google Fonts via androidx.compose.ui:ui-text-google-fonts)
-private val provider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
-)
-val Marker = FontFamily(Font(GoogleFont("Permanent Marker"), provider))
-val Hand   = FontFamily(Font(GoogleFont("Patrick Hand"), provider))
-
-object FoldballType {
-    val Display = TextStyle(fontFamily = Marker, fontSize = 58.sp, letterSpacing = (-1).sp)
-    val Title   = TextStyle(fontFamily = Marker, fontSize = 26.sp)
-    val Label   = TextStyle(fontFamily = Hand, fontSize = 20.sp, letterSpacing = 1.2.sp)
-    val Body    = TextStyle(fontFamily = Hand, fontSize = 17.sp, lineHeight = 24.sp)
-    val Caption = TextStyle(fontFamily = Hand, fontSize = 14.sp, letterSpacing = 1.1.sp)
-}
-
-// designsystem/Spacing.kt
-object Space { val xs = 4.dp; val sm = 8.dp; val md = 12.dp; val lg = 16.dp; val xl = 24.dp }
-
-// designsystem/Theme.kt
-@Composable
-fun FoldballTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(primary = InkBlue, onPrimary = Color.White,
-            surface = Paper, onSurface = Ink, error = TeamRed, background = Wood),
-        content = content
-    )
-}
-```
+`FoldballType` loads `Permanent Marker` and `Patrick Hand` from `composeResources/font/`. `FoldballTheme` provides the Material baseline; Foldball-specific controls should use the tokens and components above instead of relying on Material defaults.

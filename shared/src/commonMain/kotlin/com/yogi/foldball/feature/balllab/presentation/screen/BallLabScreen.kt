@@ -1,4 +1,4 @@
-package com.yogi.foldball.feature.balllab
+package com.yogi.foldball.feature.balllab.presentation.screen
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -15,12 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,7 +30,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -45,11 +41,18 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yogi.foldball.presentation.ball.BallEffect
-import com.yogi.foldball.presentation.ball.PaperBall
+import com.yogi.foldball.gamekit.presentation.ball.BallEffect
+import com.yogi.foldball.gamekit.presentation.ball.PaperBall
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.FoldballScaffold
+import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperButtonStyle
+import com.yogi.foldball.core.ui.theme.PaperCard
+import com.yogi.foldball.core.ui.theme.PaperChip
 import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.confetti_shapes_4
 import foldball.shared.generated.resources.paper_flake
@@ -58,9 +61,8 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-private val Paper = Color(0xFFF5F0E6)
-private val Ink = Color(0xFF24314A)
-private val Muted = Color(0xFF777A80)
+private val Ink = com.yogi.foldball.core.ui.theme.FoldballColor.Ink
+private val Muted = com.yogi.foldball.core.ui.theme.FoldballColor.InkMuted
 
 @Composable
 fun BallLabScreen() {
@@ -85,70 +87,64 @@ fun BallLabScreen() {
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(Paper).verticalScroll(rememberScrollState()).padding(16.dp),
+    FoldballScaffold {
+      Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+      ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text("FOLDBALL  /  BALL PRESENTATION", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-            Text("Animasi bola", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Paper ball procedural · VFX berbasis physics", color = Muted, fontSize = 13.sp)
+            Text("FOLDBALL  /  BALL PRESENTATION", color = Muted, style = FoldballType.Caption)
+            Text("Ball animation", color = Ink, style = FoldballType.LargeTitle)
+            Text("Procedural paper ball · physics-based VFX", color = Muted, style = FoldballType.Body)
         }
 
         BallStage(selectedEffect = selectedEffect, progress = progress, power = power)
 
-        Surface(color = Color(0xFFECE5D9), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+        PaperCard(Modifier.fillMaxWidth(), ruled = false, tilt = FoldballTilt.StatusPanel) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(selectedEffect.label.uppercase(), color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text(selectedEffect.description, color = Muted, fontSize = 11.sp)
+                        Text(selectedEffect.label.uppercase(), color = Ink, style = FoldballType.Label)
+                        Text(selectedEffect.description, color = Muted, style = FoldballType.Caption)
                     }
-                    TextButton(onClick = { replayId++ }) { Text("Putar ulang") }
+                    PaperButton("Replay", { replayId++ }, style = PaperButtonStyle.Secondary)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("INTENSITAS", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("${(power * 100).toInt()}%", color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("INTENSITY", color = Muted, style = FoldballType.Caption)
+                    Text("${(power * 100).toInt()}%", color = Ink, style = FoldballType.Caption)
                 }
                 Slider(value = power, onValueChange = { power = it })
             }
         }
 
-        Text("PILIH ANIMASI", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text("CHOOSE ANIMATION", color = Muted, style = FoldballType.Caption)
         BallEffect.entries.chunked(2).forEach { rowEffects ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 rowEffects.forEach { effect ->
                     val selected = selectedEffect == effect
-                    Surface(
+                    PaperChip(
+                        text = effect.label,
                         onClick = { selectedEffect = effect; replayId++ },
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        color = if (selected) Ink else Color(0xFFFFFCF7),
-                        shape = RoundedCornerShape(13.dp),
-                    ) {
-                        Box(Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.CenterStart) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(effect.label, color = if (selected) Color.White else Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text("${effect.durationMillis} ms · procedural", color = if (selected) Color.White.copy(alpha = .72f) else Muted, fontSize = 9.sp)
-                            }
-                        }
-                    }
+                        contentDescription = "Preview ${effect.label}",
+                        modifier = Modifier.weight(1f),
+                        selected = selected,
+                    )
                 }
                 if (rowEffects.size == 1) Spacer(Modifier.weight(1f))
             }
         }
         Text(
-            "Permukaan kertas dan crease bergerak mengikuti sudut dari jarak tempuh. Mask, highlight, inner shadow, dan collider tetap bulat; tinggi dan squash hanya mengubah tampilan.",
-            color = Muted, fontSize = 11.sp, lineHeight = 16.sp,
+            "The paper surface and creases rotate with travel. The mask, highlights, inner shadow, and collider stay round; height and squash only affect the rendering.",
+            color = Muted, style = FoldballType.Body,
         )
+      }
     }
 }
 
 @Composable
 private fun BallStage(selectedEffect: BallEffect, progress: Float, power: Float) {
-    BoxWithConstraints(
-        Modifier.fillMaxWidth().height(290.dp).shadow(3.dp, RoundedCornerShape(26.dp))
-            .clip(RoundedCornerShape(26.dp)).background(Color(0xFFE8E1D4)),
-    ) {
+    PaperCard(Modifier.fillMaxWidth().height(290.dp), ruled = false, tilt = FoldballTilt.StatusPanel) {
+      BoxWithConstraints(Modifier.fillMaxSize().clip(com.yogi.foldball.core.ui.theme.FoldballShapes.Card).background(FoldballColor.FieldPaper)) {
         val paperFlake = imageResource(Res.drawable.paper_flake)
         val confetti = imageResource(Res.drawable.confetti_shapes_4)
         val stageInset = 15f
@@ -207,13 +203,13 @@ private fun BallStage(selectedEffect: BallEffect, progress: Float, power: Float)
             val shadowWidth = radius * 1.65f * (1f - .40f * lift)
             val shadowHeight = radius * .42f * (1f - .38f * lift)
 
-            drawRoundRect(Color(0xFFF1EBE0), Offset(inset, inset), Size(size.width - inset * 2, size.height - inset * 2), androidx.compose.ui.geometry.CornerRadius(22.dp.toPx()))
-            drawRoundRect(Color(0xFFC7BFAF), Offset(inset, inset), Size(size.width - inset * 2, size.height - inset * 2), androidx.compose.ui.geometry.CornerRadius(22.dp.toPx()), style = Stroke(1.2.dp.toPx()))
-            drawLine(Color(0xFFC7BFAF), Offset(size.width * .5f, inset), Offset(size.width * .5f, size.height - inset), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx())))
-            drawCircle(Color(0xFFF9F6F0), size.height * .22f, Offset(size.width * .5f, size.height * .5f), style = Stroke(1.dp.toPx()))
+            drawRoundRect(FoldballColor.FieldHighlight, Offset(inset, inset), Size(size.width - inset * 2, size.height - inset * 2), androidx.compose.ui.geometry.CornerRadius(22.dp.toPx()))
+            drawRoundRect(FoldballColor.FieldLine, Offset(inset, inset), Size(size.width - inset * 2, size.height - inset * 2), androidx.compose.ui.geometry.CornerRadius(22.dp.toPx()), style = Stroke(1.2.dp.toPx()))
+            drawLine(FoldballColor.FieldLine, Offset(size.width * .5f, inset), Offset(size.width * .5f, size.height - inset), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx())))
+            drawCircle(FoldballColor.BallHighlight, size.height * .22f, Offset(size.width * .5f, size.height * .5f), style = Stroke(1.dp.toPx()))
 
             drawOval(
-                color = Color(0xFF51483D).copy(alpha = (.25f - .16f * lift).coerceAtLeast(.06f)),
+                color = FoldballColor.ShadowBrown.copy(alpha = (.25f - .16f * lift).coerceAtLeast(.06f)),
                 topLeft = Offset(ballCenter.x - shadowWidth * .5f, ballCenter.y + radius * .52f - shadowHeight * .5f),
                 size = Size(shadowWidth, shadowHeight),
             )
@@ -396,7 +392,8 @@ private fun BallStage(selectedEffect: BallEffect, progress: Float, power: Float)
             }
         }
 
-        Text("PAPER SURFACE · PROCEDURAL", Modifier.align(Alignment.BottomStart).padding(start = 26.dp, bottom = 23.dp), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
-        Text("${(power * 100).toInt()}% POWER", Modifier.align(Alignment.BottomEnd).padding(end = 26.dp, bottom = 23.dp), color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
+        Text("PAPER SURFACE · PROCEDURAL", Modifier.align(Alignment.BottomStart).padding(start = 26.dp, bottom = 23.dp), color = Muted, style = FoldballType.Caption)
+        Text("${(power * 100).toInt()}% POWER", Modifier.align(Alignment.BottomEnd).padding(end = 26.dp, bottom = 23.dp), color = Muted, style = FoldballType.Caption)
+      }
     }
 }

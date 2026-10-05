@@ -1,4 +1,4 @@
-package com.yogi.foldball.presentation.field
+package com.yogi.foldball.gamekit.presentation.field
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -38,13 +38,15 @@ import foldball.shared.generated.resources.field_green_paper
 import foldball.shared.generated.resources.home_desk_classroom
 import foldball.shared.generated.resources.wall_cardboard_tile
 import org.jetbrains.compose.resources.painterResource
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballShadow
 
 /** Classroom Theme colors from classroom_theme.json */
-private val FieldLineColor = Color(0xFFF4F0E6)
-private val CardboardWallColor = Color(0xFFC49A6C)
-private val CardboardStrokeColor = Color(0xFF6C4A2A)
-private val NetBgColor = Color(0xFFF2E6CF)
-private val NetMeshColor = Color(0xFFB89C77)
+private val FieldLineColor = FoldballColor.Paper
+private val CardboardWallColor = FoldballColor.Cardboard
+private val CardboardStrokeColor = FoldballColor.WoodDark
+private val NetBgColor = FoldballColor.Paper
+private val NetMeshColor = FoldballColor.PaperEdge
 
 @Composable
 fun ClassroomStadium(
@@ -60,7 +62,7 @@ fun ClassroomStadium(
         modifier = modifier
             .fillMaxWidth()
             .height(fieldHeightDp.dp)
-            .shadow(4.dp, RoundedCornerShape(26.dp))
+            .shadow(FoldballShadow.offsetY, RoundedCornerShape(26.dp))
             .clip(RoundedCornerShape(26.dp)),
     ) {
         // Layer 1: Desk Wood Background
@@ -78,18 +80,7 @@ fun ClassroomStadium(
         Box(
             modifier = Modifier.fillMaxSize(),
         ) {
-            // Layer 3a: Green Paper Field Surface
-            Image(
-                painter = painterResource(Res.drawable.field_green_paper),
-                contentDescription = "Green Paper Field",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(20.dp)),
-            )
-
-            // Layer 3b: Cardboard Collision Wall Frame (Outer Wall)
+            // Layer 3a: Cardboard remains visible as a narrow border around the playable paper.
             Image(
                 painter = painterResource(Res.drawable.wall_cardboard_tile),
                 contentDescription = "Cardboard Wall Frame",
@@ -98,6 +89,17 @@ fun ClassroomStadium(
                     .fillMaxSize()
                     .padding(12.dp),
                 alpha = 0.85f,
+            )
+
+            // Layer 3b: Green surface meets the existing 18dp playable boundary.
+            Image(
+                painter = painterResource(Res.drawable.field_green_paper),
+                contentDescription = "Green Paper Field",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(18.dp)
+                    .clip(RoundedCornerShape(20.dp)),
             )
 
             // Layer 4: Field Markings Runtime (Canvas)
@@ -404,12 +406,6 @@ private fun ClassroomGoalBottom(modifier: Modifier = Modifier) {
             style = Stroke(width = 1.5.dp.toPx()),
         )
 
-        drawRect(
-            color = Color(0xFFC18B52),
-            topLeft = Offset(w * 0.86f, 0f),
-            size = Size(w * 0.86f, 0f),
-            style = Stroke(width = 1.5.dp.toPx()),
-        )
         drawRect(
             color = Color(0xFFC18B52),
             topLeft = Offset(w * 0.86f, 0f),

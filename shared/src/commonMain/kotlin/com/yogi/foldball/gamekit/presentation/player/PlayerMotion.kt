@@ -1,4 +1,4 @@
-package com.yogi.foldball.presentation.player
+package com.yogi.foldball.gamekit.presentation.player
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing

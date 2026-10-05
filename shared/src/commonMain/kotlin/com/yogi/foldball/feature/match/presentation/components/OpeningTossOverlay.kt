@@ -1,22 +1,17 @@
-package com.yogi.foldball.feature.match.components
+package com.yogi.foldball.feature.match.presentation.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,20 +26,21 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.yogi.foldball.domain.game.engine.GameTeam
-import com.yogi.foldball.presentation.ball.PaperBall
-import com.yogi.foldball.presentation.ball.MatchBallVisualSize
-import com.yogi.foldball.presentation.theme.ClassroomTheme
+import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
+import com.yogi.foldball.gamekit.presentation.ball.PaperBall
+import com.yogi.foldball.gamekit.presentation.ball.MatchBallVisualSize
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballShapes
+import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperCard
 import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.paper_crumple_sheet_v1
 import kotlinx.coroutines.delay
@@ -60,6 +56,7 @@ import kotlin.random.Random
 fun OpeningTossOverlay(
     onWinner: (GameTeam) -> Unit,
     modifier: Modifier = Modifier,
+    teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
 ) {
     val crumple = remember { Animatable(0f) }
     val bounce = remember { Animatable(0f) }
@@ -85,30 +82,33 @@ fun OpeningTossOverlay(
         val ballY = groundY - hop
         val ballSize = MatchBallVisualSize
 
-        Column(
-            Modifier.align(Alignment.TopCenter).padding(top = 46.dp)
-                .background(ClassroomTheme.Paper, RoundedCornerShape(6.dp))
-                .padding(horizontal = 18.dp, vertical = 11.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+        PaperCard(
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 46.dp),
+            shape = FoldballShapes.Banner,
+            tilt = FoldballTilt.OpeningToss,
+            ruled = false,
         ) {
-            Text("UNDIAN KICKOFF", color = ClassroomTheme.Ink,
-                fontSize = 15.sp, fontWeight = FontWeight.Black)
-            if (winner != null) {
-                Text(
-                    when {
-                        progress < 1f -> "Bola kertas sedang memantul..."
-                        winner == GameTeam.BLUE -> "TIM BIRU MULAI!"
-                        else -> "TIM MERAH MULAI!"
-                    },
-                    color = when {
-                        progress < 1f -> ClassroomTheme.Ink
-                        winner == GameTeam.BLUE -> ClassroomTheme.TeamBlue
-                        else -> ClassroomTheme.TeamRed
-                    },
-                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
+            Column(
+                Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text("KICKOFF TOSS", style = FoldballType.Label, color = FoldballColor.Ink)
+                if (winner != null) {
+                    Text(
+                        when {
+                            progress < 1f -> "The paper ball is flipping..."
+                            else -> "TEAM ${winner?.let { teamConfiguration.forTeam(it).name }.orEmpty()} KICKS OFF!"
+                        },
+                        color = when {
+                            progress < 1f -> FoldballColor.Ink
+                            winner == GameTeam.BLUE -> FoldballColor.InkBlue
+                            else -> FoldballColor.TeamRed
+                        },
+                        style = FoldballType.Caption,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
 
@@ -171,52 +171,6 @@ fun OpeningTossOverlay(
 }
 
 @Composable
-fun OpeningTossStatusPanel(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().heightIn(min = 91.dp), contentAlignment = Alignment.CenterStart) {
-        Canvas(Modifier.fillMaxSize()) {
-            val paper = Path().apply {
-                moveTo(7.dp.toPx(), 2.dp.toPx())
-                lineTo(size.width * .48f, 0f)
-                lineTo(size.width - 6.dp.toPx(), 3.dp.toPx())
-                lineTo(size.width - 3.dp.toPx(), size.height - 4.dp.toPx())
-                lineTo(4.dp.toPx(), size.height - 2.dp.toPx())
-                close()
-            }
-            translate(top = 3.dp.toPx()) { drawPath(paper, ClassroomTheme.PaperShadow) }
-            drawPath(paper, ClassroomTheme.Paper)
-            drawPath(paper, ClassroomTheme.PaperEdge, style = Stroke(1.dp.toPx()))
-        }
-        Column(Modifier.padding(horizontal = 22.dp, vertical = 13.dp)) {
-            Text("OPENING TOSS", color = ClassroomTheme.Ink,
-                fontSize = 12.sp, fontWeight = FontWeight.Black)
-            Text("Bola berhenti di sisi tim yang mendapat kickoff pertama.",
-                color = ClassroomTheme.Ink.copy(alpha = .7f), fontSize = 10.sp)
-        }
-    }
-}
-
-@Composable
 private fun PaperTossButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier.size(140.dp, 48.dp)
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val paper = Path().apply {
-                moveTo(5.dp.toPx(), 3.dp.toPx())
-                lineTo(size.width * .42f, 1.dp.toPx())
-                lineTo(size.width - 5.dp.toPx(), 4.dp.toPx())
-                lineTo(size.width - 2.dp.toPx(), size.height - 6.dp.toPx())
-                lineTo(size.width * .55f, size.height - 2.dp.toPx())
-                lineTo(4.dp.toPx(), size.height - 4.dp.toPx())
-                close()
-            }
-            translate(top = 3.dp.toPx()) { drawPath(paper, ClassroomTheme.PaperShadow) }
-            drawPath(paper, ClassroomTheme.Paper)
-            drawPath(paper, ClassroomTheme.PaperEdge, style = Stroke(1.dp.toPx()))
-        }
-        Text("Start", color = ClassroomTheme.Ink,
-            fontSize = 12.sp, fontWeight = FontWeight.Black)
-    }
+    PaperButton("Start", onClick, modifier = modifier)
 }

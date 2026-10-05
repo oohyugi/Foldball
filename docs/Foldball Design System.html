@@ -259,7 +259,7 @@ object FoldballShapes {
 
 <section id="components">
   <h2>Shared components</h2>
-  <p>Semua composable ini ada di modul <code>core:designsystem</code> dan dipakai ulang oleh menu, pemilihan tim, arena, dan layar pertandingan. Layar tidak boleh membuat Box + clip sendiri.</p>
+  <p>Shared composables live in the existing <code>:shared</code> module and are reused by menus, team selection, the arena, and match screens. Follow <code>Foldball Design System.md</code> as the implementation guideline.</p>
 
   <div class="specs">
 
@@ -541,7 +541,8 @@ val Tape      = Color(0xFFF4D34A)
 val Grass     = Color(0xFF3F8F43)
 val Cardboard = Color(0xFFC99A62)
 
-// designsystem/Type.kt  (Google Fonts via androidx.compose.ui:ui-text-google-fonts)
+// shared/src/commonMain/kotlin/com/yogi/foldball/core/ui/theme/FoldballTokens.kt
+// Fonts are bundled as Compose Resources; do not fetch them at runtime.
 private val provider = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
     providerPackage = "com.google.android.gms",

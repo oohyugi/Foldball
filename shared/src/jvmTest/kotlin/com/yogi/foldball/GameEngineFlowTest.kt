@@ -3,6 +3,7 @@ package com.yogi.foldball
 import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchPlayer
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
 import kotlin.test.Test
@@ -38,11 +39,204 @@ class GameEngineFlowTest {
     }
 
     @Test
+    fun defendingTeamMayMoveInItsHalfButCannotEnterKickingTeamsHalfBeforeKickoff() {
+        val engine = GameEngine(393f, 580f, targetScore = null, initialKickoffTeam = GameTeam.RED)
+        val defendingPlayers = engine.snapshot.players.filter { it.team == GameTeam.BLUE }
+        assertTrue(engine.snapshot.openingKickoffPending)
+        assertTrue(defendingPlayers.all { engine.canMovePlayer(it.id) })
+
+        val bluePlayer = defendingPlayers.first { it.id == "blue-striker" }
+        val start = bluePlayer.position
+        assertTrue(engine.isZoneAvailableForPlayer(bluePlayer.id, 14))
+        assertTrue(!engine.isZoneAvailableForPlayer(bluePlayer.id, 8))
+        engine.beginPlayerMove(bluePlayer.id)
+        engine.moveInactivePlayer(bluePlayer.id, Vector2(0f, 180f))
+        engine.endPlayerMove(bluePlayer.id)
+
+        val moved = engine.snapshot.players.first { it.id == bluePlayer.id }
+        assertTrue(moved.position != start, "The defender can still reposition during opening kickoff")
+        assertTrue(moved.position.y < 580f / 2f, "Blue must remain in its own half")
+        assertEquals(1, engine.defensiveMovesUsed)
+        assertTrue(engine.snapshot.openingKickoffPending)
+    }
+
+    @Test
+    fun defenseTimeoutCommitsCurrentLegalDragPositionOnce() {
+        val engine = GameEngine(393f, 580f, targetScore = null, timing = MatchTimingConfig(1, 1))
+        beginNextDefenseAfterOpeningKick(engine)
+
+        val movable = engine.snapshot.players.first { engine.canMovePlayer(it.id) }
+        val towardCenter = if (movable.position.x < 196f) Vector2(8f, 0f) else Vector2(-8f, 0f)
+        engine.beginPlayerMove(movable.id)
+        engine.moveInactivePlayer(movable.id, towardCenter)
+        val draggedPosition = engine.snapshot.players.first { it.id == movable.id }.position
+        assertTrue(draggedPosition != movable.position)
+
+        repeat(4) { engine.step(.25f) }
+        assertEquals(GamePhase.AIMING, engine.snapshot.phase)
+        assertEquals(draggedPosition, engine.snapshot.players.first { it.id == movable.id }.position)
+        assertEquals(1, engine.defensiveMovesUsed)
+
+        engine.endPlayerMove(movable.id)
+        assertEquals(1, engine.defensiveMovesUsed)
+        engine.moveInactivePlayer(movable.id, towardCenter)
+        assertEquals(draggedPosition, engine.snapshot.players.first { it.id == movable.id }.position)
+    }
+
+    @Test
+    fun chargedKickReleasesAutomaticallyWhenAimingTimesOut() {
+        val engine = GameEngine(393f, 580f, targetScore = null, timing = MatchTimingConfig(1, 1))
+        engine.finishDefense()
+        engine.setPower(.65f) // Treat this as a partially charged kick still being held.
+
+        repeat(4) { engine.step(.25f) }
+        assertEquals(GamePhase.BALL_MOVING, engine.snapshot.phase)
+        assertEquals(.65f, engine.snapshot.lastShotPower)
+        assertTrue(engine.snapshot.ball.velocity.length() > 0f)
+        assertTrue(!engine.shoot()) // Releasing after timeout cannot launch the ball.
+        assertTrue(!engine.snapshot.openingKickoffPending)
+    }
+
+    @Test
+    fun highlightedZoneCanBeEnteredWhenItsCenterIsBlocked() {
+        for (blockerX in listOf(145f, 170f)) {
+            val engine = GameEngine(393f, 580f, targetScore = null)
+            val playerField = GameEngine::class.java.getDeclaredField("players")
+            playerField.isAccessible = true
+            playerField.set(engine, engine.snapshot.players.map { player ->
+                val position = when (player.id) {
+                    "blue-left" -> Vector2(65f, 145f)
+                    "blue-striker" -> Vector2(blockerX, 205f) // Outside zone 14, near its center path.
+                    "blue-center" -> Vector2(327f, 80f)
+                    else -> player.position
+                }
+                player.copy(position = position, home = position)
+            })
+
+            val preview = engine.legalPlayerPositionInZone("blue-left", 14)
+            assertTrue(preview != null)
+            engine.beginPlayerMove("blue-left")
+            engine.moveInactivePlayer("blue-left", Vector2(131f, 0f)) // Finger goes to zone 14 center.
+            val moved = engine.snapshot.players.first { it.id == "blue-left" }.position
+            assertEquals(preview, moved)
+            assertTrue((moved - Vector2(blockerX, 205f)).length() >= 68f)
+        }
+    }
+
+    @Test
+    fun emptyZoneBehindBallIsNotHighlightedWhenDragPathIsBlocked() {
+        val engine = GameEngine(393f, 580f, targetScore = null)
+        val playerField = GameEngine::class.java.getDeclaredField("players")
+        playerField.isAccessible = true
+        playerField.set(engine, engine.snapshot.players.map { player ->
+            val position = when (player.id) {
+                "blue-left" -> Vector2(65f, 145f)
+                "blue-center" -> Vector2(327f, 80f)
+                "blue-striker" -> Vector2(327f, 240f)
+                else -> player.position
+            }
+            player.copy(position = position, home = position)
+        })
+        val ballField = GameEngine::class.java.getDeclaredField("ball")
+        ballField.isAccessible = true
+        ballField.set(engine, engine.snapshot.ball.copy(position = Vector2(131f, 145f)))
+
+        assertTrue(engine.isZoneAvailableForPlayer("blue-left", 14))
+        assertEquals(null, engine.legalPlayerPositionInZone("blue-left", 14))
+    }
+
+    @Test
+    fun ballImpactFramesKeepVisiblePlayerBodiesSeparated() {
+        val engine = GameEngine(393f, 580f, targetScore = null)
+        engine.finishDefense()
+        engine.setPower(.6f)
+        assertTrue(engine.shoot())
+        val playerField = GameEngine::class.java.getDeclaredField("players")
+        playerField.isAccessible = true
+        playerField.set(engine, engine.snapshot.players.map { player ->
+            val position = when (player.id) {
+                "red-center" -> Vector2(185f, 450f)
+                "red-striker" -> Vector2(220f, 450f)
+                else -> player.position
+            }
+            player.copy(position = position, home = position)
+        })
+
+        engine.step(1f / 60f)
+        assertPlayersSeparated(engine.snapshot.players)
+    }
+
+    @Test
+    fun kickerApproachAvoidsPlayerStandingBehindBall() {
+        val engine = GameEngine(393f, 580f, targetScore = null)
+        val playerField = GameEngine::class.java.getDeclaredField("players")
+        playerField.isAccessible = true
+        playerField.set(engine, engine.snapshot.players.map { player ->
+            val position = when (player.id) {
+                "blue-striker" -> Vector2(196f, 330f)
+                "red-center" -> Vector2(196f, 249f)
+                "red-striker" -> Vector2(65f, 330f)
+                else -> player.position
+            }
+            player.copy(position = position, home = position)
+        })
+        val ballField = GameEngine::class.java.getDeclaredField("ball")
+        ballField.isAccessible = true
+        ballField.set(engine, engine.snapshot.ball.copy(
+            position = Vector2(196f, 290f), velocity = Vector2(0f, 0f),
+        ))
+        val phaseField = GameEngine::class.java.getDeclaredField("phase")
+        phaseField.isAccessible = true
+        phaseField.set(engine, GamePhase.BALL_MOVING)
+
+        engine.step(1f / 60f)
+        assertEquals(GamePhase.KICKER_APPROACH, engine.snapshot.phase)
+        repeat(15) {
+            engine.step(1f / 30f)
+            assertPlayersSeparated(engine.snapshot.players)
+        }
+        assertEquals(GamePhase.DEFENDING, engine.snapshot.phase)
+        assertEquals("blue-striker", engine.snapshot.focusedPlayerId)
+    }
+
+    @Test
+    fun repeatedMovesAndShotsKeepPlayersApartAndHighlightedZonesReachable() {
+        val engine = GameEngine(393f, 580f, targetScore = null)
+        repeat(8) { turn ->
+            assertEquals(GamePhase.DEFENDING, engine.snapshot.phase)
+            val movable = engine.snapshot.players.firstOrNull { engine.canMovePlayer(it.id) }
+            if (movable != null) {
+                val destination = (1..GameEngine.ZONE_COUNT).firstNotNullOfOrNull { zone ->
+                    if (!engine.isAdjacentZoneForPlayer(movable.id, zone)) null
+                    else engine.legalPlayerPositionInZone(movable.id, zone)
+                        ?.takeIf { (it - movable.position).length() > 5f }
+                }
+                if (destination != null) {
+                    engine.beginPlayerMove(movable.id)
+                    engine.moveInactivePlayer(movable.id, destination - movable.position)
+                    engine.endPlayerMove(movable.id)
+                    val moved = engine.snapshot.players.first { it.id == movable.id }
+                    assertEquals(destination, moved.position)
+                    assertPlayersSeparated(engine.snapshot.players)
+                }
+            }
+            engine.finishDefense()
+            engine.aimBy(if (turn % 2 == 0) 24f else -28f)
+            engine.setPower(.45f + .05f * (turn % 3))
+            assertTrue(engine.shoot())
+            var frames = 0
+            while (engine.snapshot.phase != GamePhase.DEFENDING && frames++ < 3_000) {
+                engine.step(1f / 30f)
+                assertPlayersSeparated(engine.snapshot.players)
+            }
+            assertTrue(frames < 3_000, "Turn $turn did not finish")
+        }
+    }
+
+    @Test
     fun goalRestoresOpeningFormationBeforeConcedingTeamKickoff() {
         val engine = GameEngine(393f, 580f, targetScore = null)
         val original = engine.snapshot.players.associate { it.id to it.position }
-        assertTrue(engine.beginPlayerMoveForTest("blue-left", Vector2(8f, 0f)))
-        assertTrue(engine.snapshot.players.first { it.id == "blue-left" }.position != original.getValue("blue-left"))
         assertTrue(engine.finishDefense())
         engine.setPower(1f)
         assertTrue(engine.shoot())
@@ -105,11 +299,29 @@ class GameEngineFlowTest {
         }
     }
 
-    private fun GameEngine.beginPlayerMoveForTest(id: String, delta: Vector2): Boolean {
-        val before = snapshot.players.first { it.id == id }.position
-        beginPlayerMove(id)
-        moveInactivePlayer(id, delta)
-        endPlayerMove(id)
-        return snapshot.players.first { it.id == id }.position != before
+    private fun beginNextDefenseAfterOpeningKick(engine: GameEngine) {
+        assertTrue(engine.snapshot.openingKickoffPending)
+        assertTrue(engine.finishDefense())
+        engine.setPower(1f)
+        assertTrue(engine.shoot())
+        var ready = false
+        repeat(20_000) {
+            if (!ready) {
+                val state = engine.step(1f / 60f)
+                ready = state.phase == GamePhase.DEFENDING && !state.openingKickoffPending
+            }
+        }
+        assertTrue(ready, "Opening kick should lead into the first live defensive formation")
+    }
+
+    private fun assertPlayersSeparated(players: List<MatchPlayer>) {
+        for (firstIndex in 0 until players.lastIndex) {
+            for (secondIndex in firstIndex + 1 until players.size) {
+                val first = players[firstIndex]
+                val second = players[secondIndex]
+                assertTrue((first.position - second.position).length() >= 67.9f,
+                    "${first.id} overlaps ${second.id}")
+            }
+        }
     }
 }

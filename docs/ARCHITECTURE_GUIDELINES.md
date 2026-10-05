@@ -8,7 +8,7 @@ Sebelum implementasi fitur, tentukan bagian yang mungkin berubah, siapa pemilikn
 
 Contoh countdown pertandingan: `MatchTimingConfig` memuat durasi bertahan dan menyerang dengan nilai awal serta batas validasi. Pembuat pertandingan memberikan config kepada `GameEngine` saat match dimulai. Engine mengelola perpindahan fase dan mengirim sisa serta total waktu melalui `GameSnapshot`; UI hanya menampilkannya. Kelak layar pengaturan cukup menghasilkan config sebelum match baru dibuat, tanpa mengubah rumus fase atau tampilan timer. Durasi match yang berjalan tetap konsisten dengan config saat match dibuat.
 
-Panel status pertandingan berada di `feature/match/components`; ia menerima snapshot dan callback, sedangkan warna dan tekstur kertas memakai token `presentation/theme`. Aturan possession, timeout, dan Undo tetap dimiliki engine.
+Panel status pertandingan berada di `feature/match/presentation/components`; ia menerima snapshot dan callback, sedangkan warna dan tekstur kertas memakai token `core/ui/theme`. Aturan possession, timeout, dan Undo tetap dimiliki engine.
 
 ## 1. Baseline Proyek
 
@@ -23,20 +23,22 @@ Paket baru dibuat ketika ada kode nyata yang menempatinya. Hindari folder kosong
 ## 2. Batas Lapisan
 
 ```text
-feature UI ──→ feature ViewModel ──→ domain rules / use case
-     │                                    ↑
-     └──→ presentation/player             │
+feature/<name>/presentation ──→ feature ViewModel ──→ domain rules / use case
+          │                              ↑
+          ├──→ gamekit/presentation ──→ domain/game
+          └──→ core/ui
 data repository ──implements──→ domain repository interface
 app/di ──merangkai semua dependency di atas
 ```
 
-- **Feature UI:** screen, event input, dan tampilan `UiState`. UI tidak mengambil data langsung dari repository.
-- **Presentation bersama:** renderer player, resep animasi visual, theme tokens, dan komponen visual reusable yang dipakai lebih dari satu screen.
+- **Feature presentation:** screen, komponen khusus fitur, event input, dan tampilan `UiState`, disimpan di dalam `feature/<name>/presentation/`. UI tidak mengambil data langsung dari repository.
+- **GameKit presentation:** renderer ball, field, dan player serta resep animasi visual yang digunakan oleh lebih dari satu fitur. GameKit tidak mengetahui screen atau navigasi fitur.
+- **Core UI:** theme tokens, paper shapes, dan kontrol visual Foldball yang dapat digunakan lintas fitur. Komponen di sini tidak memuat aturan pertandingan.
 - **Domain:** model, aturan pertandingan, dan physics yang murni Kotlin. Domain tidak mengenal Compose, Android, Coil, atau Koin.
 - **Data:** implementasi repository, API, storage, mapper. Data bergantung pada interface dan model domain.
 - **App/platform:** entry point, navigation, DI composition root, serta adapter yang hanya tersedia pada platform tertentu.
 
-Dependency mengarah ke domain. Screen dapat memakai presentation bersama; domain tidak mengimpor feature, data, atau UI.
+Dependency mengarah ke domain. Feature screen dapat memakai GameKit presentation dan Core UI; domain tidak mengimpor feature, data, atau Compose UI. `gamekit/presentation` boleh membaca model domain, tetapi tidak boleh bergantung pada feature.
 
 ## 3. MVI untuk Fitur
 
@@ -104,7 +106,13 @@ shared/src/commonMain/kotlin/com/yogi/foldball/
 │   │   └── initKoin.kt
 │   └── navigation/
 ├── core/
-│   └── ui/                  # Komponen umum tanpa aturan Foldball
+│   └── ui/
+│       └── theme/           # Foldball tokens, theme, paper shapes, dan controls
+├── gamekit/
+│   └── presentation/
+│       ├── ball/            # PaperBall dan ukuran visual bersama
+│       ├── field/           # ClassroomStadium
+│       └── player/          # PaperPlayer dan animasi visual
 ├── domain/
 │   ├── game/
 │   │   ├── model/           # Player, Ball, Team, MatchState
@@ -117,26 +125,22 @@ shared/src/commonMain/kotlin/com/yogi/foldball/
 │   ├── mapper/
 │   ├── repository/
 │   └── DataModule.kt
-├── presentation/
-│   ├── theme/
-│   │   ├── ClassroomTheme.kt       # Token warna, material kertas, elevasi, tipografi
-│   │   ├── ClassroomPaperActionButton.kt # Tombol ikon bergaya kertas
-│   │   └── components/             # Komponen theme reusable lintas fitur
-│   └── player/
-│       ├── PaperPlayer.kt   # Body, jersey, nomor, shadow
-│       ├── PlayerMotion.kt  # Resep tilt/squash/recoil
-│       └── PlayerVisual.kt  # Input tampilan yang immutable
 └── feature/
     ├── home/
-    │   └── HomeScreen.kt   # Tombol masuk Match dan Sandbox
+    │   └── presentation/
+    │       └── screen/HomeScreen.kt
     ├── match/
-    │   ├── MatchContract.kt
-    │   ├── MatchViewModel.kt
-    │   ├── MatchScreen.kt
-    │   ├── components/             # MatchScoreboard, PowerTimingMeter, komposisi HUD match
     │   ├── MatchModule.kt
+    │   └── presentation/
+    │       ├── screen/MatchScreen.kt
+    │       ├── components/         # MatchScoreboard, PowerTimingMeter, komposisi HUD
+    │       └── viewmodel/          # Contract, UiState, ViewModel saat alur bisnis memakai MVI
+    ├── balllab/
+    │   └── presentation/
+    │       └── screen/BallLabScreen.kt
     └── playerlab/           # Preview animasi saat development
-        └── PlayerLabScreen.kt
+        └── presentation/
+            └── screen/PlayerLabScreen.kt
 
 shared/src/commonMain/composeResources/
 ├── drawable/       # PNG/WebP/JPG dan Android XML VectorDrawable
@@ -150,21 +154,18 @@ shared/src/iosMain/       # Adapter iOS jika memang diperlukan
 shared/src/jvmMain/       # Adapter Desktop jika memang diperlukan
 ```
 
-`feature/match` dan `feature/playerlab` memakai renderer yang sama dari `presentation/player`. Fitur lain tidak mengimpor implementasi UI dari fitur tetangganya. `core` hanya untuk kode benar-benar umum, bukan tempat menaruh seluruh kode yang belum jelas pemiliknya.
+`feature/match/presentation` dan `feature/playerlab/presentation` memakai renderer yang sama dari `gamekit/presentation/player`. Fitur lain tidak mengimpor implementasi UI dari fitur tetangganya. `core/ui` berisi aturan visual Foldball bersama; `gamekit/presentation` berisi renderer gameplay lintas fitur. Keduanya tetap package di `:shared`, bukan Gradle module terpisah.
 
-## 6. Theme Visual Classroom Paper
+## 6. UI Design System
 
-Match memakai art direction **Classroom Paper** seperti mockup: lapangan kertas hijau di atas meja kayu, dinding karton, scoreboard dari potongan kertas berlapis, dan kontrol kecil yang terlihat seperti ikon tinta pada kertas. Theme adalah sistem visual; ia tidak memiliki state pertandingan atau aturan game.
+Before any UI implementation or visual change, read [`Foldball Design System`](Foldball%20Design%20System.md). It is the authoritative guide for the product's visual language, design tokens, shared components, accessibility requirements, and UI implementation workflow.
 
-- Token warna, bentuk kertas, outline, tekstur, elevasi/shadow, dan tipografi bersama berada di `presentation/theme/`. Hindari mengulang nilai warna dan resep surface di setiap screen.
-- Material dasar arena yang digunakan lintas screen berada di `presentation/field/`; komponen yang khusus mengatur skor, timer, tim, buku/menu, kirim, dan pause/play berada di `feature/match/components/` sebagai `MatchScoreboard`.
-- Ikon aksi reusable yang tidak menyimpan state, seperti `ClassroomPaperActionButton`, tinggal di `presentation/theme/`. `MatchScoreboard` dan `PowerTimingMeter` menyusun ikon serta data pertandingan di `feature/match/components/`. Pemilik screen memberikan label aksesibilitas dan callback; komponen visual tidak menentukan navigasi atau aksi pertandingan.
-- Scoreboard mengikuti mockup: strip tim dari kertas berwarna dengan tepi tidak rata, kartu skor putih seperti sobekan, timer gelap di tengah, label babak pada potongan kertas, serta ikon buku dan tombol aksi di ujung strip. Tombol pause berubah menjadi play saat match dijeda.
-- Gunakan bayangan lembut dan sedikit variasi sudut/tepi untuk kesan benda fisik. Jaga kontras angka skor, timer, dan kontrol; tekstur dekoratif tidak boleh mengurangi keterbacaan atau area sentuh.
-- Aset gambar/vector yang dibundel berada di `composeResources/drawable/`; token dan geometri sederhana dapat digambar dengan Compose Canvas agar ukurannya tetap tajam. Sumber desain mentah tetap di folder referensi dan tidak dibaca langsung oleh runtime.
-- Variasi tema di masa depan mengganti token/material melalui konfigurasi theme, bukan menyalin `MatchScreen`, `PaperPlayer`, atau komponen scoreboard.
-
-Perbedaan kepemilikan: `presentation/theme/` menyediakan gaya dasar, `presentation/field/` menggambar arena classroom, dan `feature/match/components/` menyusun data match menjadi scoreboard.
+- The design system is implemented inside the existing `:shared` module at `shared/src/commonMain/kotlin/com/yogi/foldball/core/ui/theme/`.
+- Keep reusable Foldball tokens and components in `core/ui/theme/`. Keep cross-feature gameplay rendering in `gamekit/presentation/`; keep match-specific compositions in `feature/match/presentation/components/`.
+- Use Compose Resources under `shared/src/commonMain/composeResources/` for bundled images, vectors, and fonts. Keep original source assets under `referensi_assets/`.
+- Reuse shared tokens and components instead of defining screen-local colors, typography, paper surfaces, shadows, or press effects. Update the design-system guide when adding a new reusable visual rule.
+- UI components receive presentation data, accessibility descriptions, and callbacks from their owners. They do not own match rules or navigation.
+- Preserve arena coordinates, gesture regions, and physics when changing the visual layer.
 
 ## 7. Penempatan Kode Player
 
@@ -174,15 +175,15 @@ Perbedaan kepemilikan: `presentation/theme/` menyediakan gaya dasar, `presentati
 | Status giliran dan aturan gerak | `domain/game/model/` + `domain/game/engine/` | `PlayerTurnStatus` (inactive/focused), reposition hanya untuk inactive saat formation, aim angle untuk kicker aktif |
 | Aturan game murni lainnya | `domain/game/engine/` | pilih player terdekat, batas reposition, shot direction, collision |
 | Aksi bisnis lintas engine/data | `domain/game/usecase/` | `StartMatch`, `RestoreMatch`, `SaveResult` jika memang diperlukan |
-| Menggambar bidak reusable | `presentation/player/` | body, layer jersey, pattern, nomor, nama, shadow |
-| Animasi kosmetik reusable | `presentation/player/` | tilt, press, spring, recoil, settle, impact |
-| State dan input layar match | `feature/match/` | `MatchIntent.DragPlayer`, `MatchUiState`, `MatchViewModel` |
-| Screen untuk melihat preset animasi | `feature/playerlab/` | tombol preview idle, aim, kick, collision |
+| Menggambar bidak reusable | `gamekit/presentation/player/` | body, layer jersey, pattern, nomor, nama, shadow |
+| Animasi kosmetik reusable | `gamekit/presentation/player/` | tilt, press, spring, recoil, settle, impact |
+| State dan input layar match | `feature/match/presentation/` | `MatchIntent.DragPlayer`, `MatchUiState`, `MatchViewModel` |
+| Screen untuk melihat preset animasi | `feature/playerlab/presentation/` | tombol preview idle, aim, kick, collision |
 | Profil/customization yang disimpan atau diambil dari server | `domain/repository/` + `data/repository/` | `PlayerProfileRepository` dan implementasinya |
 
 **Use case player:** aksi yang mengubah hasil pertandingan ditempatkan di domain. Kalkulasi kecil berada di `GameEngine`/`PlayerRules`; buat kelas use case tersendiri hanya jika perlu mengorkestrasi beberapa operasi. Animasi visual tidak membutuhkan `AnimatePlayerUseCase` karena tidak mengubah aturan pertandingan.
 
-Renderer `PaperPlayer` dan state animasi kosmetik `PlayerMotionState` berada di `presentation/player/`. Preset serta layar preview pengembangan berada di `feature/playerlab/`. `Main.kt` menyediakan entrypoint `Main()` yang membuka Home dan `SandboxMain()` yang langsung membuka tool sandbox. Root merangkai screen; pindahkan routing yang membesar ke navigation package saat alur bertambah.
+Renderer `PaperPlayer` dan state animasi kosmetik `PlayerMotionState` berada di `gamekit/presentation/player/`. Preset serta layar preview pengembangan berada di `feature/playerlab/presentation/`. `Main.kt` menyediakan entrypoint `Main()` yang membuka Home dan `SandboxMain()` yang langsung membuka tool sandbox. Root merangkai screen; pindahkan routing yang membesar ke navigation package saat alur bertambah.
 
 ## 8. Koin untuk Dependency Injection
 
