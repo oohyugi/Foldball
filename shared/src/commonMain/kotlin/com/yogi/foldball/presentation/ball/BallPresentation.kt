@@ -30,6 +30,9 @@ import org.jetbrains.compose.resources.imageResource
 import kotlin.math.abs
 import kotlin.math.sin
 
+/** Keep the opening toss ball and the in-match ball at the same visual size. */
+val MatchBallVisualSize = 16.dp
+
 /** Motion cases shown by the standalone ball presentation. */
 enum class BallEffect(val label: String, val description: String, val durationMillis: Int) {
     ROLL("Roll halus", "Sudut tekstur mengikuti jarak tempuh", 1100),

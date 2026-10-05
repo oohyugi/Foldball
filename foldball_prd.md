@@ -61,11 +61,15 @@ Arena menggunakan tampilan **top-down portrait**.
 ┌─────────────────────┐
 │       GAWANG B      │
 │                     │
-│   ▲      ▲      ▲   │
+│       ▲ DEF         │
+│   ▲ MID   ▲ MID     │
+│       ▲ ATT         │
 │                     │
 │          ⚽          │
 │                     │
-│   ●      ●      ●   │
+│       ● ATT         │
+│   ● MID   ● MID     │
+│       ● DEF         │
 │                     │
 │       GAWANG A      │
 └─────────────────────┘
@@ -73,12 +77,12 @@ Arena menggunakan tampilan **top-down portrait**.
 
 Untuk MVP:
 
-- 3 pemain Tim A
-- 3 pemain Tim B
+- 4 pemain Tim A: defender, left mid, right mid, attacker
+- 4 pemain Tim B dengan susunan cermin Tim A
 - 1 bola
 - tidak ada kiper khusus
 
-Salah satu pemain dapat ditempatkan untuk menjaga gawang.
+Defender dapat ditempatkan untuk menjaga gawang.
 
 ---
 
@@ -106,6 +110,8 @@ Future:
 ## 6. Opening Toss
 
 Sebelum kickoff pertama, dilakukan **Opening Toss**.
+
+Kertas diremas lewat sprite sheet PNG delapan frame sampai seukuran bola ketika halaman match dibuka, tanpa teks instruksi. Tombol **Start** muncul tepat di bawah bola. Saat ditekan, bola kertas memantul secara acak dan berhenti di sisi tim hasil undian. Hasil dipilih dengan peluang seimbang sebelum animasi dimulai; sesudah hasil terlihat, match otomatis masuk ke kickoff pertama. Jam pertandingan baru berjalan setelah undian selesai.
 
 ### Flow
 
@@ -214,23 +220,24 @@ A → B → A → B
 
 Setelah bola berhenti:
 
-1. sistem mencari pemain terdekat dengan bola;
-2. tim pemain tersebut mendapat giliran;
-3. pemain tersebut otomatis menjadi penendang.
+1. sistem mencari satu pemain terdekat dari masing-masing tim berdasarkan posisi fisik terhadap bola;
+2. jika selisih kedua jarak kurang dari 6 unit lapangan, giliran diberikan kepada tim yang bukan penendang sebelumnya;
+3. jika tidak seri, tim dengan pemain terdekat mendapat giliran;
+4. pemain terdekat dari tim terpilih otomatis menjadi penendang. Jarak persis sama dalam satu tim dipecahkan dengan ID pemain yang stabil.
 
 ```text
 Bola berhenti
 ↓
-Hitung jarak semua pemain
+Cari pemain terdekat tiap tim
 ↓
-A2 paling dekat
+Bandingkan jarak dan aturan seri
 ↓
 Turn Tim A
 ↓
 A2 menjadi penendang
 ```
 
-Tim yang sama dapat memperoleh giliran berturut-turut jika pemainnya kembali menjadi yang paling dekat dengan bola.
+Tim yang sama dapat memperoleh giliran berturut-turut jika pemainnya lebih dekat dari ambang seri. Zona hanya membatasi penempatan pemain; posisi fisik menentukan giliran.
 
 ---
 
@@ -266,18 +273,20 @@ Setiap player memiliki status interaksi yang mengikuti fase permainan:
 
 | Status | Peran | Gerakan yang diizinkan | Tampilan |
 | --- | --- | --- | --- |
-| **Inactive** | Player selain penendang yang sedang fokus | Dapat di-drag pada Formation Phase, dibatasi movement radius | Pose netral, tanpa highlight fokus |
+| **Inactive** | Player selain penendang yang sedang fokus | Maksimal dua pemain dari tim bertahan dapat di-drag ke posisi legal sebelum tendangan | Pose netral, tanpa highlight fokus |
 | **Active / Focused** | Penendang yang dipilih otomatis karena paling dekat dengan bola | Bergerak otomatis ke belakang bola; posisi gameplay terkunci. Drag horizontal mengatur aim; meter power bergerak otomatis selama drag | Highlight fokus dan animasi fokus ringan |
 
 Status Active/Focused dimulai ketika nearest player dipilih dan berakhir setelah tendangan serta physics selesai. Setelah bola berhenti, nearest player berikutnya menjadi fokus. Status menentukan interaksi yang tersedia; animasi visual tidak mengubah posisi physics atau collider.
 
 ## 13. Formation Phase
 
-Sebelum tendangan, user dapat mengatur pemain **Inactive**.
+Sebelum tendangan, tim yang tidak menendang mendapat **10 detik** untuk mengatur maksimal dua pemain **Inactive**. Tombol Selesai dapat mengakhiri fase ini lebih awal. Undo hanya tersedia selama waktu bertahan. Setelah itu tim penendang mendapat **8 detik** untuk aim dan menendang. Kedua countdown berhenti saat pertandingan dijeda. Angka 10/8 detik adalah nilai awal `MatchTimingConfig` per pertandingan; pengaturan durasi di masa depan mengisi config sebelum match dimulai.
 
 Player **Active/Focused** tidak dapat direposition oleh user. Sistem menempatkannya otomatis di belakang bola. Saat user mulai drag untuk membidik, meter power mulai bergerak bolak-balik. Posisi gameplay dan collider tetap di tempat. Saat release, nilai meter saat itu menentukan power; bidak snap ke depan dan sedikit overshoot lalu settle, sementara bola mulai bergerak tepat ketika snap dimulai.
 
-Pemain Inactive dapat di-drag selama Formation Phase.
+Maksimal dua pemain Inactive dari tim bertahan dapat di-drag selama Formation Phase.
+
+Jika waktu menyerang habis tanpa tendangan, bola tetap di posisi terakhir. Penendang lama mundur dari bola terlebih dahulu, lalu pemain tim bertahan yang paling dekat dengan bola bergerak ke belakang bola sebagai penendang baru. Countdown giliran baru dimulai setelah animasi pendekatan selesai.
 
 Tujuannya:
 
@@ -289,33 +298,35 @@ Tujuannya:
 
 ---
 
-## 14. Player Reposition Rules
+## 14. Zone Reposition Rules
 
-Player berstatus Inactive memiliki **movement radius** selama Formation Phase.
-
-```text
-      ○○○○○
-    ○       ○
-   ○    ●    ○
-    ○       ○
-      ○○○○○
-```
-
-Pemain hanya boleh digeser di dalam radius tersebut.
-
-Tujuannya mencegah:
-
-- teleport ke depan gawang;
-- perubahan formasi ekstrem;
-- blocking yang terlalu mudah.
-
-Initial value:
+Lapangan dibagi menjadi **18 zona** dalam 3 kolom × 6 baris. Nomor dimulai dari kiri bawah dan berurutan ke kanan, lalu naik ke baris berikutnya.
 
 ```text
-movementRadius = 100dp
+          GAWANG B
+┌──────┬──────┬──────┐
+│  16  │  17  │  18  │
+├──────┼──────┼──────┤
+│  13  │  14  │  15  │
+├──────┼──────┼──────┤
+│  10  │  11  │  12  │
+├──────┼──────┼──────┤
+│  7   │  8   │  9   │
+├──────┼──────┼──────┤
+│  4   │  5   │  6   │
+├──────┼──────┼──────┤
+│  1   │  2   │  3   │
+└──────┴──────┴──────┘
+          GAWANG A
 ```
 
-Nilai final ditentukan melalui playtesting.
+Susunan awal mengikuti zona masing-masing tim. Posisi gameplay pemain berada di pusat sprite dan area tabrakannya agar susunan kedua tim tampak simetris. Defender kedua tim memakai offset maju yang sama besar di dalam zonanya; defender Tim A di zona 2 dan defender Tim B di zona 17. Left mid dan right mid kedua tim juga memakai offset maju yang sama besar, mengikuti arah serangan timnya: Tim A di zona 4 dan 6, Tim B di zona 13 dan 15. Striker tim yang tidak mengambil kickoff mundur dengan offset yang sama; kicker memulai dari zona 8 untuk Tim A atau zona 11 untuk Tim B. Setelah approach, kicker berdiri di belakang bola.
+
+Sebelum tim penendang menembak, tim bertahan boleh mereposisi **maksimal dua pemain berbeda**. Setiap pemain dapat berpindah maksimal **satu zona** ke salah satu dari delapan zona tetangga (horizontal, vertikal, atau diagonal), atau tetap di zona asal. Pemain dapat pindah ke zona mana pun di grid; tidak ada batas zona berdasarkan peran.
+
+Zona tujuan legal jika kosong dari **semua pemain lain**, baik teman maupun lawan. Saat diseret, pemain mengikuti jari di dalam zona asal atau zona tetangga yang legal; posisinya tidak snap ke tengah zona. Gerakan berhenti pada titik legal terakhir bila mencapai zona ilegal, tepi lapangan, bola, atau pemain lain. Setelah pemain dipindahkan dan dilepas, satu jatah reposisi terpakai meskipun ia tetap di zona asal. Tombol Undo mengembalikan perpindahan terakhir beserta jatahnya dan dapat dipakai berulang hingga semua perpindahan dibatalkan; Undo tidak tersedia setelah tendangan. Garis grid tidak tampil sebelum tendangan. Hanya saat pemain diseret, zona yang legal disorot secara halus dan sorotan dibatasi di dalam garis tepi lapangan.
+
+Benturan bola tetap menggerakkan pemain secara halus melalui physics; perpindahan karena benturan tetap dibatasi oleh radius dari posisi terakhir yang ditetapkan. MVP dimulai dengan 4 pemain per tim. Rekomendasi batas atas roster untuk lapangan 18 zona adalah 6 pemain per tim.
 
 ---
 
@@ -421,9 +432,9 @@ Penendang bergerak otomatis ke belakang bola
 ↓
 Formation phase
 ↓
-Atur posisi player inactive
+Tim bertahan: 10 detik, maksimal dua player inactive; Undo atau Selesai
 ↓
-Drag horizontal penendang aktif untuk aim
+Tim menyerang: 8 detik untuk drag horizontal penendang aktif
 ↓
 Guide line mengikuti aim; meter power bergerak bolak-balik
 ↓
@@ -431,6 +442,8 @@ Release saat meter menunjukkan power yang diinginkan
 ↓
 Tendangan dilakukan
 ```
+
+Jika 8 detik menyerang habis tanpa tendangan: penendang lama mundur, bola tetap, pemain bertahan terdekat menjadi penendang baru, lalu fase bertahan berikutnya dimulai.
 
 Selama drag aktif, gerakan horizontal hanya mengatur aim dan meter power bergerak otomatis. Gerakan vertikal diabaikan. Release mengakhiri gesture, mengambil nilai power saat itu, lalu menendang.
 
@@ -509,6 +522,8 @@ Player
 Nomor dan nama dirender secara runtime.
 
 Warna dan pattern jersey juga diterapkan secara runtime.
+
+Pada kamera lapangan yang tetap, Tim A/Merah di bawah terlihat dari belakang saat menyerang ke atas, sedangkan Tim B/Biru di atas terlihat dari depan saat menyerang ke bawah. Detail panel dan posisi nama membedakan kedua sisi; tulisan tetap tegak dan mudah dibaca.
 
 Bagian bawah pemain tetap terbuka tanpa lipatan tambahan agar sesuai dengan bentuk permainan kertas asli dan mendukung animasi pegas.
 
@@ -1021,7 +1036,7 @@ Contoh:
 AI mampu:
 
 1. menentukan penendang;
-2. reposition 1–2 pemain;
+2. reposition maksimal dua pemain saat bertahan;
 3. menentukan aim;
 4. menentukan power;
 5. melakukan shoot.
@@ -1054,7 +1069,8 @@ Target:
 
 - 1 arena
 - 2 tim
-- 3 pemain per tim
+- 4 pemain per tim
+- 18-zone field (3 × 6)
 - 1 bola
 - Opening Toss
 - kickoff
@@ -1242,18 +1258,21 @@ whenPhysicsStopped():
         handleGoal()
         return
 
-    nearestPlayer = findNearestPlayer(ball.position)
+    nearestRed = findNearestPlayer(RED, ball.position, stableIdTieBreak)
+    nearestBlue = findNearestPlayer(BLUE, ball.position, stableIdTieBreak)
+    if abs(distance(nearestRed) - distance(nearestBlue)) < 6 and lastKickingTeam exists:
+        currentTeam = opposite(lastKickingTeam)
+    else:
+        currentTeam = teamWithShorterDistance(nearestRed, nearestBlue, stableIdTieBreak)
 
-    currentTeam = nearestPlayer.team
-
-    kicker = nearestPlayer
+    kicker = nearestPlayerFrom(currentTeam)
 
     moveKickerToBall()
 
     startFormationPhase()
 ```
 
-Selama Formation Phase, hanya player berstatus Inactive yang dapat di-reposition. Kicker Active/Focused terkunci di belakang bola. Saat masuk Aiming, drag horizontal pada kicker mengubah `kickerAimAngle` tanpa mengubah posisi fisiknya.
+Selama Formation Phase 10 detik, maksimal dua player Inactive dari tim bertahan dapat di-reposition; perpindahan terakhir dapat di-undo atau fase diakhiri dengan Selesai. Kicker Active/Focused terkunci di belakang bola. Saat masuk Aiming 8 detik, drag horizontal pada kicker mengubah `kickerAimAngle` tanpa mengubah posisi fisiknya. Timeout menyerang menyerahkan bola di tempat kepada pemain bertahan terdekat setelah penendang lama mundur.
 
 Opening Toss:
 

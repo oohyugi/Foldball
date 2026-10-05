@@ -1,0 +1,615 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Foldball Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+/* Layout: sticky section nav, then Foundations (color, type, spacing, shapes) and Shared components, each specimen = live preview on a wood desk + Compose code. */
+:root {
+  --wood: #9a6a3c;
+  --wood-dark: #6f4524;
+  --paper: #f6f1e4;
+  --paper-line: #c9d4ea;
+  --ink: #1c1c22;
+  --ink-blue: #1f4fc4;
+  --tape: #f4d34a;
+  --red: #d64545;
+  --grass: #3f8f43;
+  --cardboard: #c99a62;
+  --page: #231a12;
+  --page-2: #2d2218;
+  --fg: #f2e9d8;
+  --dim: #bfae93;
+  --line: rgba(255,255,255,.13);
+  --font-display: "Permanent Marker", "Marker Felt", cursive;
+  --font-hand: "Patrick Hand", "Comic Sans MS", cursive;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--fg);
+  font-family: var(--font-hand); font-size: 17px; line-height: 1.5;
+  padding-inline: 16px; padding-block: 0 64px;
+}
+.wrap { max-width: 1040px; margin-inline: auto; }
+nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--page); border-bottom: 1px solid var(--line);
+  margin-inline: -16px; padding: 10px 16px; display: flex; gap: 8px; overflow-x: auto;
+}
+nav a {
+  flex: none; color: var(--fg); text-decoration: none; padding: 3px 14px; border-radius: 4px;
+  font-size: 15px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+}
+nav a:hover { background: var(--tape); color: var(--ink); border-color: var(--tape); }
+nav a:focus-visible { outline: 3px solid var(--tape); outline-offset: 2px; }
+header { padding-block: 40px 12px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(40px, 9vw, 64px); line-height: 1; margin: 0 0 12px; color: var(--tape); text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 400; font-size: 30px; margin: 0 0 6px; color: #fff; scroll-margin-top: 70px; }
+h3 { font-family: var(--font-display); font-weight: 400; font-size: 19px; margin: 0; color: #fff; letter-spacing: .02em; }
+p { margin: 0; color: var(--dim); max-width: 64ch; }
+section { padding-block: 40px 0; display: flex; flex-direction: column; gap: 20px; }
+code, .mono { font-family: var(--font-mono); font-size: 13px; color: var(--tape); }
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 22px; }
+.principles div { border-top: 2px solid var(--tape); padding-top: 8px; min-width: 0; }
+.principles b { display: block; color: #fff; font-weight: 400; font-size: 19px; }
+
+/* swatches */
+.sw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.sw { background: var(--page-2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.sw i { display: block; height: 56px; }
+.sw div { padding: 8px 10px 10px; }
+.sw b { display: block; font-weight: 400; font-size: 18px; color: #fff; }
+.sw span { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+
+/* tables */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 16px; }
+th, td { text-align: left; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 500; white-space: nowrap; }
+.t-display { font-family: var(--font-display); font-size: 40px; line-height: 1.1; color: #fff; white-space: nowrap; }
+.t-title { font-family: var(--font-display); font-size: 28px; line-height: 1.1; color: #fff; white-space: nowrap; }
+.t-label { font-size: 20px; letter-spacing: .06em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+.t-body { font-size: 17px; color: #fff; white-space: nowrap; }
+.t-cap { font-size: 14px; color: #fff; white-space: nowrap; }
+
+.bars { display: flex; flex-wrap: wrap; gap: 18px; align-items: end; }
+.bar { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.bar i { display: block; height: 18px; background: var(--tape); }
+
+/* specimens */
+.specs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+@media (max-width: 800px) { .specs { grid-template-columns: minmax(0, 1fr); } }
+.spec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.spec.wide { grid-column: 1 / -1; }
+.spec .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.spec .head code { color: var(--dim); }
+.desk {
+  border-radius: 10px; padding: 22px 18px; min-height: 130px;
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center;
+  background:
+    repeating-linear-gradient(92deg, rgba(60,32,12,.10) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(88deg, rgba(255,230,190,.06) 0 1px, transparent 1px 15px),
+    linear-gradient(180deg, #a87647, #8d5d33 55%, #a06e40);
+}
+.desk.col { flex-direction: column; align-items: stretch; }
+pre {
+  margin: 0; padding: 14px 16px; overflow-x: auto; background: #130d08; border-radius: 8px;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; color: #eadfca; border: 1px solid var(--line);
+}
+.copy { align-self: flex-start; font-family: var(--font-hand); font-size: 15px; background: var(--tape); color: var(--ink); border: 0; padding: 3px 14px; cursor: pointer; border-radius: 4px; }
+.copy:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* ---- torn shapes (same point lists as the Kotlin tornShape calls) ---- */
+.s-card   { clip-path: polygon(0 4%, 12% 0, 36% 3%, 62% 0, 88% 3%, 100% 1%, 99% 38%, 100% 70%, 98% 100%, 70% 97%, 40% 100%, 14% 97%, 1% 100%, 2% 62%); }
+.s-button { clip-path: polygon(1% 12%, 8% 3%, 30% 8%, 52% 2%, 76% 7%, 97% 2%, 100% 30%, 98% 62%, 100% 92%, 74% 97%, 50% 100%, 26% 95%, 6% 99%, 0 70%, 2% 40%); }
+.s-chip   { clip-path: polygon(4% 8%, 30% 2%, 58% 7%, 96% 3%, 99% 40%, 95% 96%, 60% 100%, 28% 94%, 3% 98%, 0 50%); }
+.s-banner { clip-path: polygon(0 6%, 5% 1%, 14% 5%, 30% 0, 48% 4%, 66% 0, 84% 4%, 97% 0, 100% 10%, 98% 40%, 100% 72%, 96% 96%, 80% 100%, 60% 96%, 42% 100%, 22% 95%, 8% 100%, 1% 90%, 3% 55%); }
+.sh { filter: drop-shadow(0 4px 3px rgba(40,20,5,.45)); }
+.sh-hard { filter: drop-shadow(0 4px 0 rgba(10,25,80,.55)); }
+
+.ruled { background: repeating-linear-gradient(0deg, transparent 0 21px, var(--paper-line) 21px 22px), var(--paper); }
+
+/* components */
+.chip { width: 46px; height: 46px; display: grid; place-items: center; background: var(--paper); border: 0; padding: 0; cursor: pointer; }
+.chip svg { width: 28px; height: 28px; }
+.btn { border: 0; cursor: pointer; font-family: var(--font-display); font-size: 26px; padding: 10px 26px; min-height: 52px; transition: transform .12s; }
+.btn:hover:not(:disabled) { transform: rotate(-1deg) scale(1.03); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn.primary { background: var(--ink-blue); color: #fff; }
+.btn.secondary { background: var(--paper); color: var(--ink); }
+.btn.danger { background: var(--red); color: #fff; }
+.btn:disabled { background: #b9b2a2; color: #6d675b; cursor: not-allowed; }
+.chip:focus-visible, .btn:focus-visible, .tog:focus-visible, .pick:focus-visible, .mcard:focus-visible { outline: 3px solid var(--tape); outline-offset: 3px; }
+.tape { display: inline-block; padding: 2px 14px; background: var(--tape); color: var(--ink); font-size: 14px; letter-spacing: .08em; text-transform: uppercase; transform: rotate(-1deg); }
+.tape.blue { background: var(--ink-blue); color: #fff; }
+.mcard { width: 160px; min-height: 118px; border: 0; cursor: pointer; text-align: center; color: var(--ink); font-family: var(--font-hand);
+  background:
+    radial-gradient(circle at 7px 50%, #8d5d33 0 3.5px, transparent 4px) 0 0 / 14px 22px repeat-y,
+    repeating-linear-gradient(0deg, transparent 0 21px, var(--paper-line) 21px 22px), var(--paper);
+  padding: 12px 10px 12px 18px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 8px; position: relative; }
+.mcard h4 { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
+.mcard svg { height: 48px; width: auto; }
+.mcard.locked::after { content: ""; position: absolute; inset: 0; background: rgba(60,55,50,.45); }
+.lockbadge { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; z-index: 1; }
+.tog { display: inline-flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--ink); font-size: 20px; }
+.tog .box { width: 30px; height: 30px; border: 3px solid var(--ink); border-radius: 4px 7px 5px 8px; background: var(--paper); display: grid; place-items: center; }
+.tog svg { width: 22px; height: 22px; opacity: 0; }
+.tog[aria-checked="true"] svg { opacity: 1; }
+.togrow { background: var(--paper); padding: 12px 22px 12px 18px; display: flex; flex-direction: column; gap: 10px; }
+.picks { display: flex; gap: 14px; }
+.pick { width: 74px; height: 74px; border: 0; background: var(--paper); cursor: pointer; display: grid; place-items: center; position: relative; padding: 0; }
+.pick svg { width: 52px; height: 48px; }
+.pick[aria-pressed="true"]::before { content: ""; position: absolute; inset: 2px; border: 3px solid var(--ink-blue); border-radius: 46% 54% 52% 48% / 55% 45% 55% 45%; transform: rotate(-4deg); }
+.score { display: flex; align-items: center; gap: 12px; background: var(--paper); padding: 10px 24px; font-family: var(--font-display); font-size: 34px; color: var(--ink); }
+.score .b { color: var(--ink-blue); } .score .r { color: var(--red); }
+.score small { font-family: var(--font-hand); font-size: 14px; letter-spacing: .1em; display: block; color: #555; text-align: center; }
+.dialog { width: min(100%, 320px); padding: 26px 22px 22px; display: flex; flex-direction: column; gap: 12px; text-align: center; color: var(--ink); }
+.dialog h4 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 26px; }
+.dialog p { color: #444; font-size: 17px; margin-inline: auto; }
+.dialog .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.dialog .btn { font-size: 20px; min-height: 44px; padding: 6px 18px; }
+.toast { background: var(--ink); color: var(--paper); padding: 10px 22px; font-size: 18px; transform: rotate(-.8deg); }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+
+<div class="wrap">
+<nav aria-label="Sections">
+  <a href="#foundations">Foundations</a>
+  <a href="#components">Shared components</a>
+  <a href="#theme">Theme setup</a>
+</nav>
+
+<header>
+  <h1>Foldball Design System</h1>
+  <p>Semua layar Foldball dibangun dari satu meja belajar: kayu sebagai alas, kertas sobek sebagai permukaan, tinta bolpoin sebagai teks, selotip kuning untuk penekanan. Halaman ini berisi token dan komponen shared untuk Jetpack Compose.</p>
+  <div class="principles">
+    <div><b>Kertas di atas kayu</b>Setiap kontrol adalah selembar kertas atau potongan selotip di atas meja.</div>
+    <div><b>Miring sedikit</b>Rotasi tiap elemen berbeda tipis. Jangan pernah 0 derajat untuk kartu.</div>
+    <div><b>Bayangan keras</b>Offset ke bawah, tanpa blur besar. Seperti kertas yang ditempel, bukan melayang.</div>
+  </div>
+</header>
+
+<section id="foundations">
+  <h2>Foundations</h2>
+
+  <h3>Color</h3>
+  <div class="sw-grid">
+    <div class="sw"><i style="background:#9a6a3c"></i><div><b>Wood</b><span>#9A6A3C, alas semua layar</span></div></div>
+    <div class="sw"><i style="background:#6f4524"></i><div><b>WoodDark</b><span>#6F4524, serat & bayangan</span></div></div>
+    <div class="sw"><i style="background:#f6f1e4"></i><div><b>Paper</b><span>#F6F1E4, kartu & dialog</span></div></div>
+    <div class="sw"><i style="background:#c9d4ea"></i><div><b>PaperLine</b><span>#C9D4EA, garis buku tulis</span></div></div>
+    <div class="sw"><i style="background:#1c1c22"></i><div><b>Ink</b><span>#1C1C22, teks & outline</span></div></div>
+    <div class="sw"><i style="background:#1f4fc4"></i><div><b>InkBlue</b><span>#1F4FC4, aksi utama, tim biru</span></div></div>
+    <div class="sw"><i style="background:#d64545"></i><div><b>TeamRed</b><span>#D64545, tim merah, bahaya</span></div></div>
+    <div class="sw"><i style="background:#f4d34a"></i><div><b>Tape</b><span>#F4D34A, label & fokus</span></div></div>
+    <div class="sw"><i style="background:#3f8f43"></i><div><b>Grass</b><span>#3F8F43, lapangan</span></div></div>
+    <div class="sw"><i style="background:#c99a62"></i><div><b>Cardboard</b><span>#C99A62, pinggir arena</span></div></div>
+  </div>
+
+  <h3>Typography</h3>
+  <div class="scroll"><table>
+    <tr><th>Style</th><th>Contoh</th><th>Font</th><th>Spec</th></tr>
+    <tr><td class="mono">display</td><td><span class="t-display">FoldBall</span></td><td>Permanent Marker</td><td class="mono">58sp, spacing -1</td></tr>
+    <tr><td class="mono">title</td><td><span class="t-title">PLAY</span></td><td>Permanent Marker</td><td class="mono">40sp / 26sp</td></tr>
+    <tr><td class="mono">label</td><td><span class="t-label">Team</span></td><td>Patrick Hand</td><td class="mono">20sp, caps, +0.06em</td></tr>
+    <tr><td class="mono">body</td><td><span class="t-body">Flick the ball into the goal</span></td><td>Patrick Hand</td><td class="mono">17sp, line 24sp</td></tr>
+    <tr><td class="mono">caption</td><td><span class="t-cap">Paper football game</span></td><td>Patrick Hand</td><td class="mono">14sp, caps, +0.08em</td></tr>
+  </table></div>
+
+  <h3>Spacing, rotation, elevation</h3>
+  <div class="bars">
+    <div class="bar"><i style="width:4px"></i><span class="mono">xs 4dp</span></div>
+    <div class="bar"><i style="width:8px"></i><span class="mono">sm 8dp</span></div>
+    <div class="bar"><i style="width:12px"></i><span class="mono">md 12dp</span></div>
+    <div class="bar"><i style="width:16px"></i><span class="mono">lg 16dp</span></div>
+    <div class="bar"><i style="width:24px"></i><span class="mono">xl 24dp</span></div>
+  </div>
+  <div class="scroll"><table>
+    <tr><th>Token</th><th>Nilai</th><th>Dipakai untuk</th></tr>
+    <tr><td class="mono">Tilt.Banner</td><td class="mono">-1.6°</td><td>Banner judul</td></tr>
+    <tr><td class="mono">Tilt.Cards</td><td class="mono">+1.0° / -1.2° / -0.8° / +1.3°</td><td>Grid menu, urut kiri-kanan, atas-bawah</td></tr>
+    <tr><td class="mono">Shadow.Soft</td><td class="mono">y 4dp, alpha 45%</td><td>Kartu, chip, banner</td></tr>
+    <tr><td class="mono">Shadow.Hard</td><td class="mono">y 4dp, tanpa blur, biru tua</td><td>Tombol PLAY dan tombol utama</td></tr>
+    <tr><td class="mono">Touch target</td><td class="mono">min 48dp</td><td>Semua yang bisa ditekan</td></tr>
+    <tr><td class="mono">Press scale</td><td class="mono">0.97, 120ms</td><td>Tombol dan kartu saat ditekan</td></tr>
+  </table></div>
+
+  <h3>Torn paper shapes</h3>
+  <p>Empat bentuk sobekan, semuanya poligon dengan titik pecahan 0..1 sehingga ukurannya fleksibel. Di Compose dipakai lewat satu fungsi <code>tornShape</code>.</p>
+  <div class="desk">
+    <div class="sh"><div class="ruled s-card" style="width:130px;height:84px;display:grid;place-items:center;color:var(--ink)">CardShape</div></div>
+    <div class="sh-hard"><div class="s-button" style="width:150px;height:54px;background:var(--ink-blue);color:#fff;display:grid;place-items:center;font-family:var(--font-display);font-size:20px">ButtonShape</div></div>
+    <div class="sh"><div class="s-chip" style="width:84px;height:60px;background:var(--paper);display:grid;place-items:center;color:var(--ink);font-size:15px">ChipShape</div></div>
+    <div class="sh"><div class="ruled s-banner" style="width:170px;height:84px;display:grid;place-items:center;color:var(--ink)">BannerShape</div></div>
+  </div>
+  <pre id="code-shapes">fun tornShape(vararg p: Pair&lt;Float, Float&gt;) = GenericShape { size, _ -&gt;
+    p.forEachIndexed { i, (x, y) -&gt;
+        val px = x * size.width
+        val py = y * size.height
+        if (i == 0) moveTo(px, py) else lineTo(px, py)
+    }
+    close()
+}
+
+object FoldballShapes {
+    val Card = tornShape(
+        0f to .04f, .12f to 0f, .36f to .03f, .62f to 0f, .88f to .03f, 1f to .01f,
+        .99f to .38f, 1f to .70f, .98f to 1f, .70f to .97f, .40f to 1f, .14f to .97f,
+        .01f to 1f, .02f to .62f
+    )
+    val Button = tornShape(
+        .01f to .12f, .08f to .03f, .30f to .08f, .52f to .02f, .76f to .07f, .97f to .02f,
+        1f to .30f, .98f to .62f, 1f to .92f, .74f to .97f, .50f to 1f, .26f to .95f,
+        .06f to .99f, 0f to .70f, .02f to .40f
+    )
+    val Chip = tornShape(
+        .04f to .08f, .30f to .02f, .58f to .07f, .96f to .03f, .99f to .40f,
+        .95f to .96f, .60f to 1f, .28f to .94f, .03f to .98f, 0f to .50f
+    )
+    val Banner = tornShape(
+        0f to .06f, .05f to .01f, .14f to .05f, .30f to 0f, .48f to .04f, .66f to 0f,
+        .84f to .04f, .97f to 0f, 1f to .10f, .98f to .40f, 1f to .72f, .96f to .96f,
+        .80f to 1f, .60f to .96f, .42f to 1f, .22f to .95f, .08f to 1f, .01f to .90f, .03f to .55f
+    )
+}</pre>
+  <button class="copy" data-for="code-shapes" type="button">Copy kode</button>
+</section>
+
+<section id="components">
+  <h2>Shared components</h2>
+  <p>Semua composable ini ada di modul <code>core:designsystem</code> dan dipakai ulang oleh menu, pemilihan tim, arena, dan layar pertandingan. Layar tidak boleh membuat Box + clip sendiri.</p>
+
+  <div class="specs">
+
+    <div class="spec wide">
+      <div class="head"><h3>FoldballScaffold</h3><code>layar apa pun</code></div>
+      <p>Alas kayu untuk setiap layar. Menggambar serat lewat <code>drawBehind</code> dan menangani insets sistem.</p>
+      <pre id="c-scaffold">@Composable
+fun FoldballScaffold(
+    modifier: Modifier = Modifier,
+    topBar: @Composable () -&gt; Unit = {},
+    content: @Composable ColumnScope.() -&gt; Unit
+) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFFA87647), Wood, Color(0xFFA06E40))))
+            .drawBehind { drawWoodGrain(WoodDark.copy(alpha = .10f), spacing = 9.dp.toPx()) }
+            .systemBarsPadding()
+            .padding(horizontal = 14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            topBar()
+            content()
+        }
+    }
+}</pre>
+      <button class="copy" data-for="c-scaffold" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>PaperCard</h3><code>base surface</code></div>
+      <div class="desk"><div class="sh" style="transform:rotate(-1.2deg)"><div class="ruled s-card" style="width:220px;padding:20px 22px;color:var(--ink)">Surface dasar untuk kartu, banner, dan dialog.</div></div></div>
+      <pre id="c-card">@Composable
+fun PaperCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = FoldballShapes.Card,
+    tilt: Float = 0f,
+    ruled: Boolean = true,
+    content: @Composable BoxScope.() -&gt; Unit
+) = Box(
+    modifier
+        .rotate(tilt)
+        .softShadow(shape)
+        .clip(shape)
+        .background(Paper)
+        .then(if (ruled) Modifier.drawBehind { drawRuledLines(PaperLine, 22.dp.toPx()) } else Modifier),
+    content = content
+)</pre>
+      <button class="copy" data-for="c-card" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>PaperChip</h3><code>icon button</code></div>
+      <div class="desk">
+        <div class="sh"><button class="chip s-chip" aria-label="Notebook"><svg viewBox="0 0 32 32" fill="none" stroke="#1f4fc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="20" height="24" rx="2"/><path d="M3 9h5M3 15h5M3 21h5M12 11q2-3 4 0t4 0M12 17q2-3 4 0t4 0"/></svg></button></div>
+        <div class="sh"><button class="chip s-chip" aria-label="Settings"><svg viewBox="0 0 32 32" fill="none" stroke="#1c1c22" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="4.5"/><path d="M16 3v4M16 25v4M3 16h4M25 16h4M7 7l3 3M22 22l3 3M25 7l-3 3M10 22l-3 3"/></svg></button></div>
+      </div>
+      <pre id="c-chip">@Composable
+fun PaperChip(
+    icon: Painter,
+    contentDescription: String,
+    onClick: () -&gt; Unit,
+    modifier: Modifier = Modifier
+) = PressableSurface(
+    onClick = onClick,
+    shape = FoldballShapes.Chip,
+    modifier = modifier.size(48.dp)
+) {
+    Icon(icon, contentDescription, Modifier.size(28.dp).align(Alignment.Center), tint = Ink)
+}</pre>
+      <button class="copy" data-for="c-chip" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec wide">
+      <div class="head"><h3>PaperButton</h3><code>primary / secondary / danger / disabled</code></div>
+      <div class="desk">
+        <div class="sh-hard"><button class="btn primary s-button" type="button">PLAY</button></div>
+        <div class="sh"><button class="btn secondary s-button" type="button">BACK</button></div>
+        <div class="sh"><button class="btn danger s-button" type="button">QUIT</button></div>
+        <div class="sh"><button class="btn primary s-button" type="button" disabled>LOCKED</button></div>
+      </div>
+      <pre id="c-btn">enum class PaperButtonStyle(val container: Color, val content: Color) {
+    Primary(InkBlue, Color.White),
+    Secondary(Paper, Ink),
+    Danger(TeamRed, Color.White)
+}
+
+@Composable
+fun PaperButton(
+    text: String,
+    onClick: () -&gt; Unit,
+    modifier: Modifier = Modifier,
+    style: PaperButtonStyle = PaperButtonStyle.Primary,
+    enabled: Boolean = true,
+    leading: (@Composable () -&gt; Unit)? = null
+) = PressableSurface(
+    onClick = onClick,
+    enabled = enabled,
+    shape = FoldballShapes.Button,
+    color = if (enabled) style.container else Color(0xFFB9B2A2),
+    shadow = if (style == PaperButtonStyle.Primary) ShadowStyle.Hard else ShadowStyle.Soft,
+    modifier = modifier.heightIn(min = 52.dp)
+) {
+    Row(Modifier.padding(horizontal = 26.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        leading?.invoke()
+        Text(text, style = FoldballType.Title, color = if (enabled) style.content else Color(0xFF6D675B))
+    }
+}
+
+// PressableSurface: scale 0.97 saat pressed, spring 120ms
+@Composable
+fun PressableSurface(onClick: () -&gt; Unit, shape: Shape, modifier: Modifier = Modifier,
+                     enabled: Boolean = true, color: Color = Paper,
+                     shadow: ShadowStyle = ShadowStyle.Soft, content: @Composable BoxScope.() -&gt; Unit) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(120))
+    Box(
+        modifier.scale(scale).shadowFor(shadow, shape).clip(shape).background(color)
+            .clickable(src, null, enabled = enabled, onClick = onClick),
+        content = content
+    )
+}</pre>
+      <button class="copy" data-for="c-btn" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>TapeLabel</h3><code>penekanan</code></div>
+      <div class="desk"><span class="tape">Paper football game</span><span class="tape blue">New</span></div>
+      <pre id="c-tape">@Composable
+fun TapeLabel(text: String, modifier: Modifier = Modifier, color: Color = Tape,
+              contentColor: Color = Ink) =
+    Text(
+        text.uppercase(), style = FoldballType.Caption, color = contentColor,
+        modifier = modifier.rotate(-1f).background(color).padding(horizontal = 14.dp, vertical = 2.dp)
+    )</pre>
+      <button class="copy" data-for="c-tape" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>MenuCard</h3><code>grid menu</code></div>
+      <div class="desk">
+        <div class="sh" style="transform:rotate(1deg)"><button class="mcard s-card" type="button"><h4>Team</h4>
+          <svg viewBox="0 0 190 56"><use href="#shirt" x="0" width="60" height="56" style="color:#2f6fe0"/><use href="#shirt" x="65" width="60" height="56" style="color:#e04a4a"/><use href="#shirt" x="130" width="60" height="56" style="color:#f1cf3a"/></svg></button></div>
+        <div class="sh" style="transform:rotate(-1.2deg)"><button class="mcard s-card locked" type="button" aria-label="Arena, locked"><svg class="lockbadge" viewBox="0 0 50 50"><rect x="6" y="20" width="38" height="26" rx="3" fill="#555" stroke="#1c1c22" stroke-width="2.4"/><path d="M14 20v-6a11 11 0 0122 0v6" fill="none" stroke="#1c1c22" stroke-width="3"/></svg><h4>Arena</h4>
+          <svg viewBox="0 0 70 50"><rect x="3" y="4" width="64" height="42" fill="#3f8f43" stroke="#1c1c22" stroke-width="2.4"/><path d="M35 4v42" stroke="#fff" stroke-width="2"/><circle cx="35" cy="25" r="8" fill="none" stroke="#fff" stroke-width="2"/></svg></button></div>
+      </div>
+      <pre id="c-menu">@Composable
+fun MenuCard(
+    title: String,
+    tilt: Float,
+    locked: Boolean = false,
+    onClick: () -&gt; Unit,
+    modifier: Modifier = Modifier,
+    art: @Composable RowScope.() -&gt; Unit
+) = PressableSurface(
+    onClick = onClick, enabled = !locked, shape = FoldballShapes.Card,
+    modifier = modifier.rotate(tilt).heightIn(min = 118.dp).semantics { if (locked) stateDescription = "Locked" }
+) {
+    Column(Modifier.padding(start = 18.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+           horizontalAlignment = Alignment.CenterHorizontally,
+           verticalArrangement = Arrangement.SpaceBetween) {
+        Text(title.uppercase(), style = FoldballType.Label, color = Ink)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), content = art)
+    }
+    if (locked) Box(Modifier.matchParentSize().background(Color(0x733C3732)))
+}</pre>
+      <button class="copy" data-for="c-menu" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>PaperToggle</h3><code>pengaturan</code></div>
+      <div class="desk">
+        <div class="sh"><div class="togrow s-card">
+          <button class="tog" role="switch" aria-checked="true" type="button"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="#1f4fc4" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l6 6L21 4"/></svg></span>Sound</button>
+          <button class="tog" role="switch" aria-checked="false" type="button"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="#1f4fc4" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l6 6L21 4"/></svg></span>Vibration</button>
+        </div></div>
+      </div>
+      <pre id="c-toggle">@Composable
+fun PaperToggle(label: String, checked: Boolean, onChange: (Boolean) -&gt; Unit) =
+    Row(
+        Modifier.toggleable(checked, role = Role.Switch, onValueChange = onChange).minimumInteractiveComponentSize(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Canvas(Modifier.size(30.dp)) {
+            drawRoundRect(Ink, style = Stroke(3.dp.toPx()), cornerRadius = CornerRadius(6.dp.toPx()))
+            if (checked) drawCheckStroke(InkBlue, width = 3.4.dp.toPx())
+        }
+        Text(label, style = FoldballType.Label.copy(letterSpacing = 0.sp), color = Ink)
+    }</pre>
+      <button class="copy" data-for="c-toggle" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>CirclePicker</h3><code>pilih tim / bola</code></div>
+      <div class="desk">
+        <div class="picks">
+          <div class="sh"><button class="pick s-chip" aria-pressed="true" aria-label="Blue team" type="button"><svg viewBox="0 0 60 56" style="color:#2f6fe0"><use href="#shirt"/></svg></button></div>
+          <div class="sh"><button class="pick s-chip" aria-pressed="false" aria-label="Red team" type="button"><svg viewBox="0 0 60 56" style="color:#e04a4a"><use href="#shirt"/></svg></button></div>
+          <div class="sh"><button class="pick s-chip" aria-pressed="false" aria-label="Yellow team" type="button"><svg viewBox="0 0 60 56" style="color:#f1cf3a"><use href="#shirt"/></svg></button></div>
+        </div>
+      </div>
+      <pre id="c-pick">@Composable
+fun CirclePickerItem(selected: Boolean, label: String, onClick: () -&gt; Unit,
+                     content: @Composable BoxScope.() -&gt; Unit) =
+    PressableSurface(onClick, FoldballShapes.Chip, Modifier.size(74.dp).semantics { this.selected = selected; contentDescription = label }) {
+        content()
+        if (selected) Canvas(Modifier.matchParentSize().rotate(-4f).padding(2.dp)) {
+            drawOval(InkBlue, style = Stroke(3.dp.toPx()))   // lingkaran coretan tangan
+        }
+    }</pre>
+      <button class="copy" data-for="c-pick" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec">
+      <div class="head"><h3>ScoreBoard</h3><code>layar match</code></div>
+      <div class="desk"><div class="sh" style="transform:rotate(-.8deg)"><div class="score s-chip"><div><span class="b">2</span><small>BLUE</small></div><span>:</span><div><span class="r">1</span><small>RED</small></div></div></div></div>
+      <pre id="c-score">@Composable
+fun ScoreBoard(blue: Int, red: Int, modifier: Modifier = Modifier) =
+    PaperCard(modifier, shape = FoldballShapes.Chip, ruled = false) {
+        Row(Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            ScoreDigit(blue, InkBlue, "BLUE")
+            Text(":", style = FoldballType.Title, color = Ink)
+            ScoreDigit(red, TeamRed, "RED")
+        }
+    }</pre>
+      <button class="copy" data-for="c-score" type="button">Copy kode</button>
+    </div>
+
+    <div class="spec wide">
+      <div class="head"><h3>PaperDialog & InkToast</h3><code>konfirmasi, umpan balik</code></div>
+      <div class="desk" style="flex-direction:column;gap:22px">
+        <div class="sh" style="transform:rotate(.6deg);width:100%;display:flex;justify-content:center"><div class="ruled s-banner dialog">
+          <h4>Quit match?</h4>
+          <p>Skor saat ini tidak akan disimpan.</p>
+          <div class="row"><button class="btn secondary s-button" type="button">STAY</button><button class="btn danger s-button" type="button">QUIT</button></div>
+        </div></div>
+        <div class="sh"><div class="toast s-chip" style="padding-inline:28px">Team saved</div></div>
+      </div>
+      <pre id="c-dialog">@Composable
+fun PaperDialog(title: String, message: String, onDismiss: () -&gt; Unit,
+                confirmText: String, onConfirm: () -&gt; Unit,
+                dismissText: String = "STAY", danger: Boolean = false) =
+    Dialog(onDismissRequest = onDismiss) {
+        PaperCard(shape = FoldballShapes.Banner, tilt = .6f) {
+            Column(Modifier.padding(22.dp, 26.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                   verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(title, style = FoldballType.Title, color = Ink)
+                Text(message, style = FoldballType.Body, color = Color(0xFF444444), textAlign = TextAlign.Center)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PaperButton(dismissText, onDismiss, style = PaperButtonStyle.Secondary)
+                    PaperButton(confirmText, onConfirm,
+                        style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary)
+                }
+            }
+        }
+    }
+
+// Toast: SnackbarHost dengan container Ink, teks Paper, shape Chip, tilt -0.8f</pre>
+      <button class="copy" data-for="c-dialog" type="button">Copy kode</button>
+    </div>
+  </div>
+</section>
+
+<section id="theme">
+  <h2>Theme setup</h2>
+  <p>Token warna, tipografi, dan spacing dikumpulkan di satu tempat. Tema ini sengaja satu mode saja (tidak ada dark mode), karena meja kayu adalah identitas game.</p>
+  <pre id="c-theme">// designsystem/Color.kt
+val Wood      = Color(0xFF9A6A3C)
+val WoodDark  = Color(0xFF6F4524)
+val Paper     = Color(0xFFF6F1E4)
+val PaperLine = Color(0xFFC9D4EA)
+val Ink       = Color(0xFF1C1C22)
+val InkBlue   = Color(0xFF1F4FC4)
+val TeamRed   = Color(0xFFD64545)
+val Tape      = Color(0xFFF4D34A)
+val Grass     = Color(0xFF3F8F43)
+val Cardboard = Color(0xFFC99A62)
+
+// designsystem/Type.kt  (Google Fonts via androidx.compose.ui:ui-text-google-fonts)
+private val provider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs
+)
+val Marker = FontFamily(Font(GoogleFont("Permanent Marker"), provider))
+val Hand   = FontFamily(Font(GoogleFont("Patrick Hand"), provider))
+
+object FoldballType {
+    val Display = TextStyle(fontFamily = Marker, fontSize = 58.sp, letterSpacing = (-1).sp)
+    val Title   = TextStyle(fontFamily = Marker, fontSize = 26.sp)
+    val Label   = TextStyle(fontFamily = Hand, fontSize = 20.sp, letterSpacing = 1.2.sp)
+    val Body    = TextStyle(fontFamily = Hand, fontSize = 17.sp, lineHeight = 24.sp)
+    val Caption = TextStyle(fontFamily = Hand, fontSize = 14.sp, letterSpacing = 1.1.sp)
+}
+
+// designsystem/Spacing.kt
+object Space { val xs = 4.dp; val sm = 8.dp; val md = 12.dp; val lg = 16.dp; val xl = 24.dp }
+
+// designsystem/Theme.kt
+@Composable
+fun FoldballTheme(content: @Composable () -&gt; Unit) {
+    MaterialTheme(
+        colorScheme = lightColorScheme(primary = InkBlue, onPrimary = Color.White,
+            surface = Paper, onSurface = Ink, error = TeamRed, background = Wood),
+        content = content
+    )
+}</pre>
+  <button class="copy" data-for="c-theme" type="button">Copy kode</button>
+</section>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="shirt" viewBox="0 0 60 56">
+      <path d="M18 4 L6 12 L1 26 L11 30 L13 22 L13 52 L47 52 L47 22 L49 30 L59 26 L54 12 L42 4 Q30 14 18 4 Z" fill="currentColor" stroke="#1c1c22" stroke-width="2.2" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<script>
+(function () {
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = document.getElementById(btn.getAttribute('data-for'));
+      function fallback() {
+        var r = document.createRange(); r.selectNodeContents(pre);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        btn.textContent = 'Terpilih, tekan Ctrl+C';
+      }
+      try {
+        navigator.clipboard.writeText(pre.innerText).then(function () { btn.textContent = 'Tersalin'; }, fallback);
+      } catch (e) { fallback(); }
+      setTimeout(function () { btn.textContent = 'Copy kode'; }, 2200);
+    });
+  });
+  document.querySelectorAll('.tog').forEach(function (t) {
+    t.addEventListener('click', function () {
+      t.setAttribute('aria-checked', t.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+    });
+  });
+  var picks = document.querySelectorAll('.pick');
+  picks.forEach(function (p) {
+    p.addEventListener('click', function () {
+      picks.forEach(function (o) { o.setAttribute('aria-pressed', o === p ? 'true' : 'false'); });
+    });
+  });
+})();
+</script>
+
+</body></html>

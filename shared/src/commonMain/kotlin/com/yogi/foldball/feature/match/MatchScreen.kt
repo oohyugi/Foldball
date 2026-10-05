@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -36,13 +38,19 @@ import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchTimingConfig
+import com.yogi.foldball.feature.match.components.MatchStatusPanel
+import com.yogi.foldball.feature.match.components.OpeningTossOverlay
+import com.yogi.foldball.feature.match.components.OpeningTossStatusPanel
 import com.yogi.foldball.domain.game.engine.Vector2
 import com.yogi.foldball.feature.match.components.PowerTimingMeter
 import com.yogi.foldball.feature.match.components.MatchScoreboard
 import com.yogi.foldball.feature.match.components.GoalCelebrationOverlay
 import com.yogi.foldball.presentation.ball.PaperBall
+import com.yogi.foldball.presentation.ball.MatchBallVisualSize
 import com.yogi.foldball.presentation.field.ClassroomStadium
 import com.yogi.foldball.presentation.player.PaperPlayer
+import com.yogi.foldball.presentation.player.PlayerFacing
 import com.yogi.foldball.presentation.player.PlayerFocusState
 import com.yogi.foldball.presentation.player.rememberPlayerMotionState
 import foldball.shared.generated.resources.Res
@@ -58,17 +66,23 @@ private const val powerMeterCycleSeconds = 1.8f
 private const val minimumTimingPower = .05f
 
 @Composable
-fun MatchSandboxScreen() = MatchExperienceScreen(fullMatch = false)
+fun MatchSandboxScreen(timing: MatchTimingConfig = MatchTimingConfig()) =
+    MatchExperienceScreen(fullMatch = false, timing = timing)
 
 @Composable
-fun FullMatchScreen(onOpenTools: (String) -> Unit) = MatchExperienceScreen(
+fun FullMatchScreen(
+    timing: MatchTimingConfig = MatchTimingConfig(),
+    onOpenTools: (String) -> Unit,
+) = MatchExperienceScreen(
     fullMatch = true,
+    timing = timing,
     onOpenTools = onOpenTools,
 )
 
 @Composable
 private fun MatchExperienceScreen(
     fullMatch: Boolean,
+    timing: MatchTimingConfig,
     onOpenTools: (String) -> Unit = {},
 ) {
     val density = LocalDensity.current.density
@@ -77,13 +91,16 @@ private fun MatchExperienceScreen(
     var isPaused by remember { mutableStateOf(false) }
     var isMatchFinished by remember { mutableStateOf(false) }
     var matchKey by remember { mutableIntStateOf(0) }
+    var openingKickoffTeam by remember(matchKey) {
+        mutableStateOf<GameTeam?>(if (fullMatch) null else GameTeam.RED)
+    }
     var redScore by remember { mutableIntStateOf(0) }
     var blueScore by remember { mutableIntStateOf(0) }
     var matchElapsedSeconds by remember { mutableIntStateOf(0) }
     var showMatchMenu by remember { mutableStateOf(false) }
     var showShareSummary by remember { mutableStateOf(false) }
-    LaunchedEffect(fullMatch, isPaused, isMatchFinished) {
-        if (fullMatch && !isMatchFinished) {
+    LaunchedEffect(fullMatch, isPaused, isMatchFinished, openingKickoffTeam) {
+        if (fullMatch && !isMatchFinished && openingKickoffTeam != null) {
             while (true) {
                 delay(1_000)
                 if (!isPaused) matchElapsedSeconds += 1
@@ -143,14 +160,26 @@ private fun MatchExperienceScreen(
             } else {
                 470f
             }
-            val engine = remember(fieldWidth, fieldHeight, matchKey) {
-                GameEngine(fieldWidth, fieldHeight, targetScore = if (fullMatch) 3 else null)
+            val engine = remember(fieldWidth, fieldHeight, matchKey, openingKickoffTeam) {
+                GameEngine(fieldWidth, fieldHeight,
+                    targetScore = if (fullMatch) 3 else null,
+                    timing = timing,
+                    initialKickoffTeam = openingKickoffTeam ?: GameTeam.RED,
+                )
             }
             var state by remember(engine) { mutableStateOf(engine.snapshot) }
             val goalShake = remember(engine) { Animatable(0f) }
             var kickingPlayerId by remember(engine) { mutableStateOf<String?>(null) }
+            var movingPlayerId by remember(engine) { mutableStateOf<String?>(null) }
             var showAimGuide by remember(engine) { mutableStateOf(false) }
             var isPowerTiming by remember(engine) { mutableStateOf(false) }
+            LaunchedEffect(state.phase) {
+                if (state.phase == GamePhase.TURNOVER_RETREAT) {
+                    isPowerTiming = false
+                    showAimGuide = false
+                    playerMotion.cancelPowerCharge()
+                }
+            }
             LaunchedEffect(engine, state.phase, state.lastScoringTeam) {
                 if (state.phase == GamePhase.GOAL) {
                     goalShake.snapTo(0f)
@@ -195,9 +224,10 @@ private fun MatchExperienceScreen(
                 var previous = 0L
                 while (true) {
                     withFrameNanos { now ->
-                        if (!isPaused && previous != 0L && engine.snapshot.phase != GamePhase.AIMING) {
+                        if (!isPaused && openingKickoffTeam != null && previous != 0L &&
+                            engine.snapshot.phase != GamePhase.MATCH_OVER) {
                             val nextState = engine.step(
-                                ((now - previous) / 1_000_000_000f).coerceAtMost(1f / 30f)
+                                (now - previous) / 1_000_000_000f
                             )
                             state = nextState
                             redScore = nextState.redScore
@@ -246,8 +276,36 @@ private fun MatchExperienceScreen(
                     shakeTopGoal = state.phase == GamePhase.GOAL && state.lastScoringTeam == GameTeam.RED,
                     shakeBottomGoal = state.phase == GamePhase.GOAL && state.lastScoringTeam == GameTeam.BLUE,
                 ) {
+                    if (fullMatch && openingKickoffTeam == null) {
+                        OpeningTossOverlay(onWinner = { openingKickoffTeam = it })
+                    } else {
                     Canvas(Modifier.fillMaxSize()) {
                         val h = size.height
+                        if (state.phase == GamePhase.DEFENDING && movingPlayerId != null) {
+                            val cellWidth = size.width / GameEngine.ZONE_COLUMNS
+                            val cellHeight = size.height / GameEngine.ZONE_ROWS
+                            val movingId = movingPlayerId!!
+                            val fieldInset = 18.dp.toPx()
+                            clipRect(
+                                left = fieldInset,
+                                top = fieldInset,
+                                right = size.width - fieldInset,
+                                bottom = size.height - fieldInset,
+                            ) {
+                                for (zone in 1..GameEngine.ZONE_COUNT) {
+                                    val index = zone - 1
+                                    val column = index % GameEngine.ZONE_COLUMNS
+                                    val rowFromTop = GameEngine.ZONE_ROWS - 1 - index / GameEngine.ZONE_COLUMNS
+                                    val topLeft = Offset(column * cellWidth, rowFromTop * cellHeight)
+                                    val color = when {
+                                        engine.isZoneAvailableForPlayer(movingId, zone) -> Color(0x2B3CA66B)
+                                        engine.isZoneOccupied(zone, exceptPlayerId = movingId) -> Color(0x223E2723)
+                                        else -> Color.Transparent
+                                    }
+                                    drawRect(color, topLeft, Size(cellWidth, cellHeight))
+                                }
+                            }
+                        }
                         val ball = state.ball.position
                         val ballX = ball.x * density
                         val ballY = ball.y * density
@@ -277,38 +335,53 @@ private fun MatchExperienceScreen(
 
                     state.players.forEach { player ->
                         val focused = player.id == state.focusedPlayerId
+                        val activeTeam = state.players.first { it.id == state.focusedPlayerId }.team
+                        val canMove = engine.canMovePlayer(player.id)
                         val isKicking = player.id == kickingPlayerId
-                        val showFocus = focused && state.phase == GamePhase.AIMING
-                        val inputBlocked = state.phase != GamePhase.AIMING || isPaused
+                        val showFocus = focused && (state.phase == GamePhase.DEFENDING || state.phase == GamePhase.AIMING)
                         val playerSize = 76.dp
                         val visualAimAngle =
                             if (player.team == GameTeam.RED) state.aimAngle else -state.aimAngle
                         val displayedX by animateDpAsState(
                             targetValue = player.position.x.dp,
-                            animationSpec = spring(dampingRatio = .92f, stiffness = 1200f),
+                            animationSpec = if (movingPlayerId == player.id) snap() else spring(dampingRatio = .92f, stiffness = 1200f),
                         )
                         val displayedY by animateDpAsState(
                             targetValue = player.position.y.dp,
-                            animationSpec = spring(dampingRatio = .92f, stiffness = 1200f),
+                            animationSpec = if (movingPlayerId == player.id) snap() else spring(dampingRatio = .92f, stiffness = 1200f),
                         )
                         val kickProgress = if (isKicking) playerMotion.kickProgress else 0f
+                        val kickDirectionY = if (player.team == GameTeam.RED) -1f else 1f
                         PaperPlayer(
                             modifier = Modifier.offset(
                                 displayedX - playerSize / 2 + 8.dp * (sin(visualAimAngle) * kickProgress),
-                                displayedY - playerSize * .80f - 20.dp - 20.dp * (cos(visualAimAngle) * kickProgress),
+                                displayedY - playerSize / 2 + 20.dp * (kickDirectionY * cos(visualAimAngle) * kickProgress),
                             )
                                 .size(playerSize)
-                                .pointerInput(player.id, focused, inputBlocked) {
-                                    if (!focused && !inputBlocked) {
-                                        detectDragGestures { change, drag ->
+                                .pointerInput(player.id, focused, state.phase, isPaused, activeTeam, canMove) {
+                                    if (!focused && canMove && !isPaused && state.phase == GamePhase.DEFENDING && player.team != activeTeam) {
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                movingPlayerId = player.id
+                                                engine.beginPlayerMove(player.id)
+                                                refresh()
+                                            },
+                                            onDragEnd = {
+                                                engine.endPlayerMove(player.id)
+                                                movingPlayerId = null
+                                                refresh()
+                                            },
+                                            onDragCancel = {
+                                                engine.endPlayerMove(player.id)
+                                                movingPlayerId = null
+                                                refresh()
+                                            },
+                                        ) { change, drag ->
                                             change.consume()
-                                            engine.moveInactivePlayer(
-                                                player.id,
-                                                Vector2(drag.x / density, drag.y / density)
-                                            )
+                                            engine.moveInactivePlayer(player.id, Vector2(drag.x / density, drag.y / density))
                                             refresh()
                                         }
-                                    } else if (focused && !inputBlocked) {
+                                    } else if (focused && !isPaused && state.phase == GamePhase.AIMING) {
                                         detectDragGestures(
                                             onDragStart = {
                                                 showAimGuide = true
@@ -334,6 +407,7 @@ private fun MatchExperienceScreen(
                                         }
                                     }
                                 },
+                            facing = if (player.team == GameTeam.RED) PlayerFacing.BACK else PlayerFacing.FRONT,
                             focusState = when {
                                 showFocus -> PlayerFocusState.FOCUSED
                                 isKicking -> PlayerFocusState.KICKING
@@ -525,7 +599,7 @@ private fun MatchExperienceScreen(
                     }
                     val ballStretch = (state.ball.velocity.length() / 700f).coerceIn(0f, .08f)
                     val airborneScale = ballLift * .08f
-                    val ballVisualSize = 16.dp
+                    val ballVisualSize = MatchBallVisualSize
                     PaperBall(
                         rotationX = state.ball.rotationX,
                         rotationY = state.ball.rotationY,
@@ -552,53 +626,21 @@ private fun MatchExperienceScreen(
                         visible = state.phase == GamePhase.GOAL,
                         scoringTeam = state.lastScoringTeam,
                     )
+                    }
                 }
 
-                val active = state.players.first { it.id == state.focusedPlayerId }
-                val aimDegrees = (state.aimAngle * 180f / PI.toFloat()).toInt()
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    color = Color(0xFFECE5D9),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Column(
-                        Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            when (state.phase) {
-                                GamePhase.BALL_MOVING -> "BOLA BERGERAK"
-                                GamePhase.KICKER_APPROACH -> "KICKER MENUJU BOLA"
-                                GamePhase.AIMING -> if (fullMatch) "GILIRAN ${active.team.name} · ${aimDegrees}°" else "GILIRAN ${active.team.name} · ${aimDegrees}° AIM"
-                                GamePhase.GOAL -> "GOL TIM ${state.lastScoringTeam?.name}"
-                                GamePhase.MATCH_OVER -> "PERTANDINGAN SELESAI"
-                            },
-                            color = Color(0xFF24314A),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                when {
-                                    isPaused -> "PERTANDINGAN DIJEDA"
-                                    state.phase == GamePhase.GOAL -> "Kickoff berikutnya sebentar lagi"
-                                    state.phase == GamePhase.AIMING -> "Geser kiri/kanan · lepas saat power pas"
-                                    else -> "Tunggu bola berhenti"
-                                },
-                                color = Color(0xFF777A80),
-                                fontSize = 11.sp,
-                            )
-                            if (!fullMatch) Text(
-                                "${(state.power * 100).toInt()}% POWER",
-                                color = Color(0xFF777A80),
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
+                if (fullMatch && openingKickoffTeam == null) {
+                    OpeningTossStatusPanel()
+                } else {
+                    MatchStatusPanel(
+                        snapshot = state,
+                        defensiveMovesUsed = engine.defensiveMovesUsed,
+                        canUndo = engine.canUndoPlayerMove(),
+                        isPaused = isPaused,
+                        showPower = !fullMatch,
+                        onUndo = { engine.undoLastPlayerMove(); refresh() },
+                        onFinishDefense = { engine.finishDefense(); refresh() },
+                    )
                 }
             }
 

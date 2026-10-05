@@ -2,6 +2,14 @@
 
 Pedoman ini menjelaskan letak kode, arah dependency, dan pemilik state. Struktur berlaku untuk target Android, iOS, dan Desktop JVM yang sudah ada. Terapkan bertahap di satu module `shared`; pecah Gradle module hanya ketika batas fitur atau waktu build membutuhkannya.
 
+## Sebelum Menulis Kode: Rancang untuk Perubahan
+
+Sebelum implementasi fitur, tentukan bagian yang mungkin berubah, siapa pemiliknya, kapan nilainya dipilih, dan bagaimana UI membaca hasilnya. Pilih batas konfigurasi yang kecil dan bertipe; jangan menanam angka aturan di screen atau menduplikasi keputusan domain di komponen visual. Tetapkan nilai awal dan validasi input. Buat abstraksi hanya untuk variasi yang nyata atau sudah direncanakan, lalu catat jalur perubahan berikutnya.
+
+Contoh countdown pertandingan: `MatchTimingConfig` memuat durasi bertahan dan menyerang dengan nilai awal serta batas validasi. Pembuat pertandingan memberikan config kepada `GameEngine` saat match dimulai. Engine mengelola perpindahan fase dan mengirim sisa serta total waktu melalui `GameSnapshot`; UI hanya menampilkannya. Kelak layar pengaturan cukup menghasilkan config sebelum match baru dibuat, tanpa mengubah rumus fase atau tampilan timer. Durasi match yang berjalan tetap konsisten dengan config saat match dibuat.
+
+Panel status pertandingan berada di `feature/match/components`; ia menerima snapshot dan callback, sedangkan warna dan tekstur kertas memakai token `presentation/theme`. Aturan possession, timeout, dan Undo tetap dimiliki engine.
+
 ## 1. Baseline Proyek
 
 - Kotlin Multiplatform dengan target Android, iOS, dan Desktop JVM.

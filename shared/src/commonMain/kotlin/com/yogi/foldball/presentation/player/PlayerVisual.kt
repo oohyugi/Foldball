@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -31,10 +32,12 @@ import kotlin.math.PI
 
 /** Shared paper standee renderer. Gameplay position and collision stay outside this visual. */
 enum class PlayerFocusState { INACTIVE, FOCUSED, KICKING }
+enum class PlayerFacing { FRONT, BACK }
 
 @Composable
 fun PaperPlayer(
     modifier: Modifier = Modifier,
+    facing: PlayerFacing = PlayerFacing.FRONT,
     focusState: PlayerFocusState = PlayerFocusState.INACTIVE,
     powerProgress: Float = 0f,
     powerPressProgress: Float = 0f,
@@ -59,6 +62,34 @@ fun PaperPlayer(
     )
     BoxWithConstraints(modifier) {
         val labelScale = (maxWidth.value / 148f).coerceIn(.4f, 1.2f)
+        Canvas(Modifier.fillMaxSize()) {
+            val sx = size.width / 512f
+            val sy = size.height / 512f
+            fun p(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x * sx, y * sy)
+            val castShadow = Path().apply {
+                moveTo(p(119f, 400f).x, p(119f, 400f).y)
+                lineTo(p(390f, 400f).x, p(390f, 400f).y)
+                lineTo(p(502f, 456f).x, p(502f, 456f).y)
+                lineTo(p(233f, 456f).x, p(233f, 456f).y)
+                close()
+            }
+            drawPath(
+                castShadow,
+                Brush.linearGradient(
+                    colors = listOf(Ink.copy(alpha = .30f), Ink.copy(alpha = .17f), Ink.copy(alpha = .02f)),
+                    start = p(250f, 400f),
+                    end = p(502f, 456f),
+                ),
+            )
+            val contactShadow = Path().apply {
+                moveTo(p(122f, 399f).x, p(122f, 399f).y)
+                lineTo(p(390f, 399f).x, p(390f, 399f).y)
+                lineTo(p(421f, 418f).x, p(421f, 418f).y)
+                lineTo(p(148f, 418f).x, p(148f, 418f).y)
+                close()
+            }
+            drawPath(contactShadow, Ink.copy(alpha = .18f))
+        }
         if (isFocused) {
             Canvas(Modifier.fillMaxSize()) {
                 drawOval(
@@ -115,24 +146,52 @@ fun PaperPlayer(
                 lineTo(p(122f, 408f).x, p(122f, 408f).y)
                 close()
             }
-            drawPath(back, Color(0xFFE1E0DC))
-            drawPath(back, Ink, style = Stroke(width = 8f * sx))
+            val topFold = Path().apply {
+                moveTo(p(190f, 61f).x, p(190f, 61f).y)
+                lineTo(p(322f, 61f).x, p(322f, 61f).y)
+                lineTo(p(352f, 90f).x, p(352f, 90f).y)
+                lineTo(p(160f, 90f).x, p(160f, 90f).y)
+                close()
+            }
+            drawPath(topFold, if (facing == PlayerFacing.FRONT) Color(0xFFE9E5DA) else Color(0xFFA92F2B))
+            drawPath(topFold, Ink, style = Stroke(width = 7f * sx))
+            if (facing == PlayerFacing.FRONT) {
+                drawPath(back, Color(0xFFE1E0DC))
+                drawPath(back, Ink, style = Stroke(width = 8f * sx))
+            }
             drawPath(front, Color(0xFFFFFEFA))
             clipPath(front) {
                 drawRect(jerseyColor)
-                for (stripe in 0..4) {
-                    val x = (143f + stripe * 57f) * sx
-                    drawLine(Color.White.copy(alpha = .76f), p(x / sx, 92f), p(x / sx + 8f, 408f), strokeWidth = 7f * sx)
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.White.copy(alpha = .15f), Color.Transparent, Ink.copy(alpha = .19f)),
+                        startY = p(0f, 90f).y,
+                        endY = p(0f, 408f).y,
+                    ),
+                )
+                if (facing == PlayerFacing.FRONT) {
+                    for (stripe in 0..4) {
+                        val x = 143f + stripe * 57f
+                        drawLine(Color.White.copy(alpha = .76f), p(x, 92f), p(x + 8f, 408f), strokeWidth = 7f * sx)
+                    }
+                    drawLine(Color.White.copy(alpha = .45f), p(178f, 116f), p(337f, 116f), strokeWidth = 4f * sx)
+                } else {
+                    drawLine(Ink.copy(alpha = .25f), p(161f, 94f), p(123f, 406f), strokeWidth = 13f * sx)
+                    drawLine(Ink.copy(alpha = .25f), p(351f, 94f), p(389f, 406f), strokeWidth = 13f * sx)
+                    drawLine(Color.White.copy(alpha = .28f), p(181f, 111f), p(141f, 399f), strokeWidth = 5f * sx)
+                    drawLine(Color.White.copy(alpha = .28f), p(331f, 111f), p(371f, 399f), strokeWidth = 5f * sx)
+                    drawLine(Color.White.copy(alpha = .55f), p(256f, 112f), p(256f, 398f), strokeWidth = 4f * sx)
+                    drawLine(Color.White.copy(alpha = .75f), p(190f, 155f), p(322f, 155f), strokeWidth = 5f * sx)
                 }
-                drawLine(Color.White.copy(alpha = .45f), p(178f, 116f), p(337f, 116f), strokeWidth = 4f * sx)
             }
             drawPath(front, Ink, style = Stroke(width = 8f * sx))
+            drawLine(Ink.copy(alpha = .42f), p(129f, 408f), p(383f, 408f), strokeWidth = 10f * sx, cap = StrokeCap.Round)
             drawLine(Color(0xFF77736F), p(160f, 90f), p(352f, 90f), strokeWidth = 4f * sx, cap = StrokeCap.Round)
             drawLine(Color.White.copy(alpha = .48f), p(177f, 112f), p(335f, 112f), strokeWidth = 5f * sx, cap = StrokeCap.Round)
         }
         Text(number, Modifier.align(Alignment.TopCenter).offset(y = 65.dp * labelScale), color = Color.White,
             fontSize = 25.sp * labelScale, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, lineHeight = 25.sp * labelScale)
-        Text(name, Modifier.align(Alignment.TopCenter).offset(y = 91.dp * labelScale), color = Color.White,
+        Text(name, Modifier.align(Alignment.TopCenter).offset(y = (if (facing == PlayerFacing.BACK) 38.dp else 91.dp) * labelScale), color = Color.White,
             fontSize = 9.sp * labelScale, fontWeight = FontWeight.ExtraBold, letterSpacing = .8.sp * labelScale, textAlign = TextAlign.Center)
         }
     }
