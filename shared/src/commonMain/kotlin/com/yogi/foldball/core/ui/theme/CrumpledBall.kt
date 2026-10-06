@@ -6,15 +6,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.yogi.foldball.domain.team.BallStyle
+import kotlin.math.abs
 
 private val BallOutline = Path().apply {
     moveTo(30f, 3f)
@@ -42,10 +47,49 @@ private val Facets = listOf(
 )
 
 @Composable
-fun CrumpledBall(modifier: Modifier = Modifier, size: Dp = 48.dp, tint: Color = Color.Unspecified) {
-    Canvas(modifier.size(size)) {
-        scale(this.size.width / 60f, Offset.Zero) {
+fun CrumpledBall(
+    modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
+    ballStyle: BallStyle = BallStyle.CLASSIC,
+    tint: Color = Color.Unspecified,
+    rotationX: Float = 0f,
+    rotationY: Float = 0f,
+    scaleX: Float = 1f,
+    scaleY: Float = 1f,
+    impactSideX: Float = 0f,
+    impactSideY: Float = 0f,
+    impactStrength: Float = 0f
+) {
+    val impact = impactStrength.coerceIn(0f, 1f)
+    val effectiveTint = if (tint != Color.Unspecified) tint else ballStyle.tint
+    Canvas(
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                this.scaleX = scaleX * (1f - abs(impactSideX) * impact * .2f)
+                this.scaleY = scaleY * (1f - abs(impactSideY) * impact * .2f + abs(impactSideX) * impact * .06f)
+                transformOrigin = TransformOrigin(
+                    pivotFractionX = when {
+                        impactSideX > 0f -> 1f
+                        impactSideX < 0f -> 0f
+                        else -> .5f
+                    },
+                    pivotFractionY = when {
+                        impactSideY > 0f -> 1f
+                        impactSideY < 0f -> 0f
+                        else -> .5f
+                    }
+                )
+            }
+    ) {
+        val w = this.size.width
+        val h = this.size.height
+        if (w <= 0f || h <= 0f) return@Canvas
+
+        scale(w / 60f, Offset.Zero) {
             clipPath(BallOutline) {
+                drawPath(BallOutline, Color(0xFFF6F3EA))
+
                 Facets.forEach { (p, c) ->
                     drawPath(p, c)
                     drawPath(p, FoldballColor.InkBlue.copy(alpha = 0.55f), style = Stroke(.9f, join = StrokeJoin.Round))
@@ -53,6 +97,7 @@ fun CrumpledBall(modifier: Modifier = Modifier, size: Dp = 48.dp, tint: Color = 
                 for (y in listOf(18f, 31f, 44f)) {
                     drawLine(FoldballColor.InkBlue.copy(alpha = 0.55f), Offset(2f, y), Offset(58f, y - 3f), 1f)
                 }
+
                 val scribble = Path().apply {
                     moveTo(19f, 27f)
                     quadraticTo(22f, 23f, 25f, 27f)
@@ -61,10 +106,42 @@ fun CrumpledBall(modifier: Modifier = Modifier, size: Dp = 48.dp, tint: Color = 
                 }
                 drawPath(scribble, FoldballColor.InkBlue.copy(alpha = 0.8f), style = Stroke(1.3f, cap = StrokeCap.Round))
 
-                if (tint != Color.Unspecified) {
-                    drawPath(BallOutline, tint, blendMode = BlendMode.Multiply)
+                if (effectiveTint != Color.Unspecified) {
+                    drawPath(BallOutline, effectiveTint, blendMode = BlendMode.Multiply)
+                }
+
+                // Inner lighting highlight clipped to BallOutline
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = .42f), Color.Transparent),
+                        center = Offset(30f - 10f, 30f - 12f),
+                        radius = 35f
+                    ),
+                    radius = 30f,
+                    center = Offset(30f, 30f)
+                )
+
+                if (impact > .01f && (impactSideX != 0f || impactSideY != 0f)) {
+                    val contact = Offset(
+                        30f + impactSideX * 24f,
+                        30f + impactSideY * 24f
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                FoldballColor.WoodDark.copy(alpha = impact * .28f),
+                                Color.Transparent
+                            ),
+                            center = contact,
+                            radius = 30f
+                        ),
+                        radius = 30f,
+                        center = Offset(30f, 30f)
+                    )
                 }
             }
+
+            // Crisp ink border along BallOutline
             drawPath(BallOutline, FoldballColor.Ink, style = Stroke(2.4f, join = StrokeJoin.Round))
         }
     }

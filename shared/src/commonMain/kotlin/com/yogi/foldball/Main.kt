@@ -15,14 +15,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.yogi.foldball.app.navigation.AppIntent
 import com.yogi.foldball.app.navigation.AppRoute
 import com.yogi.foldball.app.navigation.AppViewModel
@@ -42,7 +44,8 @@ import com.yogi.foldball.feature.home.presentation.screen.HomeScreen
 import com.yogi.foldball.feature.match.presentation.screen.FullMatchScreen
 import com.yogi.foldball.feature.match.presentation.screen.MatchSandboxScreen
 import com.yogi.foldball.feature.playerlab.presentation.screen.PlayerLabScreen
-import com.yogi.foldball.feature.team.presentation.screen.TeamSetupRoute
+import com.yogi.foldball.feature.team.presentation.screen.TeamRoute
+import com.yogi.foldball.feature.welcome.presentation.screen.WelcomeRoute
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -64,6 +67,45 @@ private fun FoldballRoot(startAtHome: Boolean) {
         val appViewModel: AppViewModel =
             koinViewModel(key = "app:$startAtHome", parameters = { parametersOf(startAtHome) })
         val state by appViewModel.uiState.collectAsStateWithLifecycle()
+        val navController = rememberNavController()
+        fun returnHome() {
+            val destination = if (appViewModel.uiState.value.profile == null) "welcome" else "home"
+            if (!navController.popBackStack(destination, inclusive = false)) {
+                navController.navigate(destination) {
+                    popUpTo(navController.graph.id) { inclusive = false }
+                    launchSingleTop = true
+                }
+            }
+        }
+        fun openSandbox(tab: SandboxTab) {
+            appViewModel.onIntent(AppIntent.OpenSandbox(tab))
+            navController.navigate("sandbox") { launchSingleTop = true }
+        }
+        LaunchedEffect(state.initialRoute) {
+            val destination = when (state.initialRoute) {
+                AppRoute.Loading -> return@LaunchedEffect
+                AppRoute.Home -> "home"
+                AppRoute.Welcome -> "welcome"
+                AppRoute.Team -> "team"
+                AppRoute.Sandbox -> "sandbox"
+                AppRoute.Match -> "match"
+            }
+            if (navController.currentDestination?.route == "loading") {
+                navController.navigate(destination) {
+                    popUpTo("loading") { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        }
+        LaunchedEffect(appViewModel, navController) {
+            appViewModel.destinations.collect { destination ->
+                when (destination) {
+                    AppRoute.Team -> navController.navigate("team") { launchSingleTop = true }
+                    AppRoute.Welcome -> returnHome()
+                    else -> Unit
+                }
+            }
+        }
         val snackbarHostState = remember { SnackbarHostState() }
         val audio = rememberGameAudio()
         Surface(Modifier.fillMaxSize(), color = FoldballColor.Wood) {
@@ -72,111 +114,129 @@ private fun FoldballRoot(startAtHome: Boolean) {
                 LocalGameAudio provides audio
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    key(state.entryId) {
-                        CompositionLocalProvider(LocalViewModelStoreOwner provides appViewModel) {
-                            if (state.route == AppRoute.Match) {
-                                FullMatchScreen(
-                                    playAgainstBot = state.playAgainstBot,
-                                    botDifficulty = state.difficulty,
-                                    botStyle = state.style,
-                                    teamConfiguration = MatchTeamConfiguration(
-                                        red =
-                                            state.profile?.toMatchIdentity()
-                                                ?: MatchTeamConfiguration.Default.red
+                    NavHost(navController, startDestination = "loading", modifier = Modifier.fillMaxSize()) {
+                        composable("loading") {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                Column(Modifier.padding(24.dp)) {
+                                    Text(
+                                        state.error ?: "Loading your team…",
+                                        style = FoldballType.Body,
+                                        color = FoldballColor.Ink
                                     )
-                                ) { destination ->
-                                    when (destination) {
-                                        "home" -> appViewModel.onIntent(AppIntent.Home)
-
-                                        "ball" -> appViewModel.onIntent(
-                                            AppIntent.OpenSandbox(SandboxTab.BALL)
-                                        )
-
-                                        "player" -> appViewModel.onIntent(
-                                            AppIntent.OpenSandbox(SandboxTab.PLAYER)
-                                        )
-
-                                        else -> appViewModel.onIntent(AppIntent.OpenSandbox())
+                                    if (state.error !=
+                                        null
+                                    ) {
+                                        PaperButton("Retry", {
+                                            appViewModel.onIntent(
+                                                AppIntent.RetryProfile
+                                            )
+                                        })
                                     }
                                 }
-                            } else {
-                                Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                                    when (state.route) {
-                                        AppRoute.Loading -> Column(Modifier.padding(24.dp)) {
-                                            Text(
-                                                state.error ?: "Loading your team…",
-                                                style = FoldballType.Body,
-                                                color = FoldballColor.Ink
-                                            )
-                                            if (state.error !=
-                                                null
-                                            ) {
-                                                PaperButton("Retry", {
-                                                    appViewModel.onIntent(
-                                                        AppIntent.RetryProfile
-                                                    )
-                                                })
-                                            }
-                                        }
-
-                                        AppRoute.Team -> TeamSetupRoute(
-                                            onSaved = {
-                                                appViewModel.onIntent(AppIntent.TeamSaved(it))
-                                            },
-                                            onCancel = { appViewModel.onIntent(AppIntent.Home) }
+                            }
+                        }
+                        composable("home") {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                HomeScreen(
+                                    club = state.profile?.toMatchIdentity(),
+                                    ballStyle = state.ballStyle,
+                                    onBallStyleChange = {
+                                        appViewModel.onIntent(AppIntent.BallStyleSelected(it))
+                                    },
+                                    onEditClub = {
+                                        appViewModel.onIntent(AppIntent.EditTeam)
+                                    },
+                                    onTeamClick = {
+                                        appViewModel.onIntent(AppIntent.EditTeam)
+                                    },
+                                    onBallClick = {
+                                        openSandbox(SandboxTab.BALL)
+                                    },
+                                    onArenaClick = {
+                                        openSandbox(SandboxTab.MOVEMENT)
+                                    },
+                                    onMatchClick = {
+                                        appViewModel.onIntent(
+                                            AppIntent.Play(againstBot = true)
                                         )
-
-                                        AppRoute.Sandbox -> SandboxContent(
-                                            selectedTab = state.sandboxTab.name.lowercase(),
-                                            onSelectTab = {
-                                                appViewModel.onIntent(
-                                                    AppIntent.SelectSandboxTab(
-                                                        SandboxTab.valueOf(it.uppercase())
-                                                    )
-                                                )
-                                            },
-                                            onHomeClick = { appViewModel.onIntent(AppIntent.Home) }
+                                        navController.navigate("match") { launchSingleTop = true }
+                                    },
+                                    onLocalMatchClick = {
+                                        appViewModel.onIntent(
+                                            AppIntent.Play(againstBot = false)
                                         )
-
-                                        else -> HomeScreen(
-                                            club = state.profile?.toMatchIdentity(),
-                                            onEditClub = {
-                                                appViewModel.onIntent(AppIntent.EditTeam)
-                                            },
-                                            onTeamClick = {
-                                                appViewModel.onIntent(AppIntent.EditTeam)
-                                            },
-                                            onBallClick = {
-                                                appViewModel.onIntent(AppIntent.OpenSandbox(SandboxTab.BALL))
-                                            },
-                                            onArenaClick = {
-                                                appViewModel.onIntent(AppIntent.OpenSandbox(SandboxTab.MOVEMENT))
-                                            },
-                                            onMatchClick = {
-                                                appViewModel.onIntent(
-                                                    AppIntent.Play(againstBot = true)
-                                                )
-                                            },
-                                            onLocalMatchClick = {
-                                                appViewModel.onIntent(
-                                                    AppIntent.Play(againstBot = false)
-                                                )
-                                            },
-                                            style = state.style,
-                                            onStyleChange = {
-                                                appViewModel.onIntent(AppIntent.StyleSelected(it))
-                                            },
-                                            difficulty = state.difficulty,
-                                            onDifficultyChange = {
-                                                appViewModel.onIntent(
-                                                    AppIntent.DifficultySelected(it)
-                                                )
-                                            },
-                                            onSandboxClick = {
-                                                appViewModel.onIntent(AppIntent.OpenSandbox())
-                                            }
+                                        navController.navigate("match") { launchSingleTop = true }
+                                    },
+                                    style = state.style,
+                                    onStyleChange = {
+                                        appViewModel.onIntent(AppIntent.StyleSelected(it))
+                                    },
+                                    difficulty = state.difficulty,
+                                    onDifficultyChange = {
+                                        appViewModel.onIntent(
+                                            AppIntent.DifficultySelected(it)
                                         )
+                                    },
+                                    onSandboxClick = {
+                                        openSandbox(SandboxTab.MOVEMENT)
                                     }
+                                )
+                            }
+                        }
+                        composable("welcome") {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                WelcomeRoute(onSaved = {
+                                    appViewModel.onIntent(AppIntent.TeamSaved(it))
+                                    navController.navigate("home") {
+                                        popUpTo("welcome") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                })
+                            }
+                        }
+                        composable("team") {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                TeamRoute(
+                                    onSaved = {
+                                        appViewModel.onIntent(AppIntent.TeamSaved(it))
+                                        returnHome()
+                                    },
+                                    onCancel = { returnHome() }
+                                )
+                            }
+                        }
+                        composable("sandbox") {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                SandboxContent(
+                                    selectedTab = state.sandboxTab.name.lowercase(),
+                                    onSelectTab = {
+                                        appViewModel.onIntent(
+                                            AppIntent.SelectSandboxTab(
+                                                SandboxTab.valueOf(it.uppercase())
+                                            )
+                                        )
+                                    },
+                                    onHomeClick = { returnHome() }
+                                )
+                            }
+                        }
+                        composable("match") {
+                            FullMatchScreen(
+                                playAgainstBot = state.playAgainstBot,
+                                botDifficulty = state.difficulty,
+                                botStyle = state.style,
+                                ballStyle = state.ballStyle,
+                                teamConfiguration = MatchTeamConfiguration(
+                                    red =
+                                        state.profile?.toMatchIdentity()
+                                            ?: MatchTeamConfiguration.Default.red
+                                )
+                            ) { destination ->
+                                when (destination) {
+                                    "home" -> returnHome()
+                                    "ball" -> openSandbox(SandboxTab.BALL)
+                                    "player" -> openSandbox(SandboxTab.PLAYER)
+                                    else -> openSandbox(SandboxTab.MOVEMENT)
                                 }
                             }
                         }

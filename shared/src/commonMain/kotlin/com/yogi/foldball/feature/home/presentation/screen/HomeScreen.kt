@@ -2,6 +2,8 @@ package com.yogi.foldball.feature.home.presentation.screen
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +36,7 @@ import com.yogi.foldball.core.ui.theme.PaperDialog
 import com.yogi.foldball.core.ui.theme.TapeLabel
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotStyle
+import com.yogi.foldball.domain.team.BallStyle
 import com.yogi.foldball.domain.team.TeamIdentity
 import com.yogi.foldball.feature.home.presentation.components.MenuField
 import com.yogi.foldball.gamekit.presentation.team.ClubLogo
@@ -47,6 +50,8 @@ fun HomeScreen(
     onDifficultyChange: (BotDifficulty) -> Unit = {},
     style: BotStyle = BotStyle.BALANCED,
     onStyleChange: (BotStyle) -> Unit = {},
+    ballStyle: BallStyle = BallStyle.CLASSIC,
+    onBallStyleChange: (BallStyle) -> Unit = {},
     club: TeamIdentity? = null,
     onEditClub: () -> Unit = {},
     onTeamClick: () -> Unit = {},
@@ -56,6 +61,7 @@ fun HomeScreen(
 ) {
     var showDifficulty by remember { mutableStateOf(false) }
     var showHowToPlayDialog by remember { mutableStateOf(false) }
+    var showBallStyleDialog by remember { mutableStateOf(false) }
 
     FoldballScaffold(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -98,7 +104,7 @@ fun HomeScreen(
                             style = FoldballType.Display.copy(fontSize = 48.sp),
                             color = FoldballColor.InkBlue
                         )
-                        CrumpledBall(size = 40.dp)
+                        CrumpledBall(size = 40.dp, ballStyle = BallStyle.CLASSIC)
                     }
                     TapeLabel("Paper football game")
                 }
@@ -151,7 +157,7 @@ fun HomeScreen(
                         }
                     }
                     PaperCard(
-                        modifier = Modifier.weight(1f).clickable(onClick = onBallClick),
+                        modifier = Modifier.weight(1f).clickable(onClick = { showBallStyleDialog = true }),
                         ruled = true
                     ) {
                         Column(
@@ -160,7 +166,7 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text("Ball", style = FoldballType.Title, color = FoldballColor.Ink)
-                            CrumpledBall(size = 36.dp)
+                            CrumpledBall(size = 36.dp, ballStyle = ballStyle)
                         }
                     }
                 }
@@ -241,6 +247,52 @@ fun HomeScreen(
                                     modifier = Modifier.weight(1f),
                                     selected = style == tactic
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    if (showBallStyleDialog) {
+        PaperDialog(
+            title = "Choose Ball Style",
+            message = "Select your paper ball style for matches and practice.",
+            onDismiss = { showBallStyleDialog = false },
+            confirmText = "Done",
+            onConfirm = { showBallStyleDialog = false },
+            content = {
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    BallStyle.entries.forEach { option ->
+                        val selected = ballStyle == option
+                        PaperCard(
+                            modifier = Modifier.fillMaxWidth().clickable { onBallStyleChange(option) },
+                            color = if (selected) FoldballColor.Tape else FoldballColor.Paper,
+                            tilt = 0f,
+                            ruled = false
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CrumpledBall(size = 40.dp, ballStyle = option)
+                                Column(Modifier.weight(1f)) {
+                                    Text(option.label, style = FoldballType.Label, color = FoldballColor.Ink)
+                                    Text(option.description, style = FoldballType.Caption, color = FoldballColor.InkMuted)
+                                }
+                                Box(
+                                    modifier = Modifier.size(28.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selected) {
+                                        Text("✓", style = FoldballType.Label, color = FoldballColor.InkBlue)
+                                    }
+                                }
                             }
                         }
                     }

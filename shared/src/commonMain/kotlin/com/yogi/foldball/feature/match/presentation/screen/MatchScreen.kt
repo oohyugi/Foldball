@@ -45,6 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import com.yogi.foldball.core.audio.CountdownCue
 import com.yogi.foldball.core.audio.LocalGameAudio
 import com.yogi.foldball.core.audio.SoundDispatcher
@@ -69,6 +72,7 @@ import com.yogi.foldball.domain.game.engine.GoalGeometry
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
+import com.yogi.foldball.domain.team.BallStyle
 import com.yogi.foldball.feature.match.presentation.components.GoalCelebrationOverlay
 import com.yogi.foldball.feature.match.presentation.components.MatchScoreboard
 import com.yogi.foldball.feature.match.presentation.components.MatchStatusPanel
@@ -113,6 +117,7 @@ fun FullMatchScreen(
     playAgainstBot: Boolean = true,
     botDifficulty: BotDifficulty = BotDifficulty.MEDIUM,
     botStyle: BotStyle = BotStyle.BALANCED,
+    ballStyle: BallStyle = BallStyle.CLASSIC,
     standeeDamage: Boolean = true,
     timing: MatchTimingConfig = MatchTimingConfig(),
     teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
@@ -122,6 +127,7 @@ fun FullMatchScreen(
     playAgainstBot = playAgainstBot,
     botDifficulty = botDifficulty,
     botStyle = botStyle,
+    ballStyle = ballStyle,
     standeeDamage = standeeDamage,
     timing = timing,
     baseTeamConfiguration = teamConfiguration,
@@ -134,6 +140,7 @@ private fun MatchExperienceScreen(
     playAgainstBot: Boolean = false,
     botDifficulty: BotDifficulty = BotDifficulty.MEDIUM,
     botStyle: BotStyle = BotStyle.BALANCED,
+    ballStyle: BallStyle = BallStyle.CLASSIC,
     standeeDamage: Boolean = false,
     timing: MatchTimingConfig,
     baseTeamConfiguration: MatchTeamConfiguration,
@@ -174,6 +181,14 @@ private fun MatchExperienceScreen(
     var showMatchMenu by remember { mutableStateOf(false) }
     var showExitConfirmation by remember { mutableStateOf(false) }
     var showShareSummary by remember { mutableStateOf(false) }
+    NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = fullMatch && !showMatchMenu && !showExitConfirmation && !showShareSummary,
+        onBackCompleted = {
+            viewModel.onIntent(MatchIntent.SetPaused(true))
+            showExitConfirmation = true
+        }
+    )
     Column(
         if (fullMatch) {
             Modifier.fillMaxSize()
@@ -242,7 +257,6 @@ private fun MatchExperienceScreen(
                 viewModel.onIntent(MatchIntent.ConfigureArena(fieldWidth, fieldHeight))
             }
             val state = matchState.snapshot ?: return@BoxWithConstraints
-
 
             val countdownCue = remember(viewModel, matchKey) { CountdownCue() }
             val soundDispatcher = remember(viewModel, matchKey) { SoundDispatcher(state.soundEvents) }
@@ -1272,6 +1286,7 @@ private fun MatchExperienceScreen(
                         val visualBallLift = GoalGeometry.visualLift(state.ball.height).dp
                         val ballVisualSize = MatchBallVisualSize
                         PaperBall(
+                            ballStyle = ballStyle,
                             rotationX = state.ball.rotationX,
                             rotationY = state.ball.rotationY,
                             scaleX = 1f + ballStretch + airborneScale + landingSquash,
@@ -1338,8 +1353,6 @@ private fun MatchExperienceScreen(
                     }
                 }
             }
-
-
 
             if (showMatchMenu) {
                 Dialog(onDismissRequest = {

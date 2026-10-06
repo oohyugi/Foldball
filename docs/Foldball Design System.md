@@ -260,3 +260,9 @@ First launch opens Welcome within safe drawing insets. Require a trimmed nonempt
 - Scoreboard paper card wraps compact badge/short-name groups and a centered score/time column instead of stretching to full width. Center the complete card on the screen; pause remains at the leading edge with reserved clearance. Avoid weighted team groups that push badges to opposite card edges.
 
 - Team setup uses shared `FoldballSpace` values. Show Loading while the profile is read, disable edits and save while saving, and keep drafts when saving fails. Existing teams expose Save team and Cancel; first launch exposes Continue. Retry reloads only a failed initial read. UI text and accessibility descriptions remain English.
+
+- System Back during a full match opens the existing RETURN HOME? confirmation and pauses gameplay. Leave match returns Home; Keep playing or dismissing the confirmation resumes. Existing dialogs handle Back dismissal before route navigation.
+
+- Home field preview is a decorative 150 dp portrait-pitch strip in a shared Grass PaperCard with a subtle tilt and paper shadow. Blue standees face Front in the upper row; red standees face Back in the lower row. Keep complete bodies and shadows inside the crop, with a centered paper ball, horizontal halfway line, quiet paper bands, and slim Cardboard side rails. Hide decorative preview children from accessibility traversal.
+
+- Welcome is the first-launch onboarding destination while no saved team profile exists. After Continue saves successfully, replace Welcome with Home so Back cannot reopen onboarding. Team is a separate management destination opened from Home: load the saved name, short name, and crest; Save or Cancel returns Home. Both routes use shared paper form controls, preserve drafts on save failure, and receive safe drawing insets from the app root.

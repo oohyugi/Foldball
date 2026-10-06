@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yogi.foldball.core.ui.theme.FoldballColor
@@ -27,6 +28,7 @@ import com.yogi.foldball.core.ui.theme.FoldballSpace
 import com.yogi.foldball.core.ui.theme.FoldballTilt
 import com.yogi.foldball.core.ui.theme.FoldballType
 import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperButtonStyle
 import com.yogi.foldball.core.ui.theme.PaperCard
 import com.yogi.foldball.domain.team.ClubBadges
 import com.yogi.foldball.domain.team.TeamProfile
@@ -38,7 +40,7 @@ import com.yogi.foldball.gamekit.presentation.team.ClubLogo
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun TeamSetupRoute(onSaved: (TeamProfile) -> Unit, onCancel: () -> Unit) {
+fun TeamRoute(onSaved: (TeamProfile) -> Unit, onCancel: () -> Unit) {
     val viewModel: TeamViewModel = koinViewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) {
@@ -49,40 +51,76 @@ fun TeamSetupRoute(onSaved: (TeamProfile) -> Unit, onCancel: () -> Unit) {
             }
         }
     }
-    TeamSetupScreen(state, viewModel::onIntent)
+    TeamScreen(state, viewModel::onIntent)
 }
 
 @Composable
-fun TeamSetupScreen(state: TeamUiState, onIntent: (TeamIntent) -> Unit) {
+fun TeamScreen(state: TeamUiState, onIntent: (TeamIntent) -> Unit) {
     FoldballScaffold {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(FoldballSpace.lg),
-            verticalArrangement = Arrangement.spacedBy(FoldballSpace.lg)
+            verticalArrangement = Arrangement.spacedBy(FoldballSpace.lg),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                if (state.editing) "YOUR TEAM" else "WELCOME TO FOLDBALL",
-                style = FoldballType.LargeTitle,
-                color = FoldballColor.Ink
-            )
-            Text(
-                "Name your club and choose its badge.",
-                style = FoldballType.Body,
-                color = FoldballColor.Ink
-            )
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(FoldballSpace.xs)
+            ) {
+                Text(
+                    "YOUR CLUB",
+                    style = FoldballType.LargeTitle,
+                    color = FoldballColor.Ink
+                )
+                Text(
+                    "Manage your club profile, name, and crest",
+                    style = FoldballType.Body,
+                    color = FoldballColor.InkMuted,
+                    textAlign = TextAlign.Center
+                )
+            }
+
             if (state.loading) {
-                Text("Loading your team…", style = FoldballType.Body, color = FoldballColor.Ink)
+                Text("Loading your club…", style = FoldballType.Body, color = FoldballColor.Ink)
                 return@Column
             }
+
             state.error?.let { error ->
                 Text(error, style = FoldballType.Body, color = FoldballColor.TeamRed)
                 if (state.loadFailed) {
                     PaperButton("Retry", { onIntent(TeamIntent.Retry) }, enabled = !state.saving)
                 }
             }
-            PaperCard(Modifier.fillMaxWidth(), tilt = FoldballTilt.StatusPanel, ruled = false) {
+
+            // Current Badge Preview Card
+            PaperCard(
+                modifier = Modifier.fillMaxWidth(),
+                tilt = FoldballTilt.PaperCard,
+                ruled = false
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(FoldballSpace.lg),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(FoldballSpace.md)
+                ) {
+                    ClubLogo(
+                        state.badgeId,
+                        "Selected badge",
+                        Modifier.size(80.dp)
+                    )
+                    Text(
+                        state.name.ifEmpty { "Club Name" },
+                        style = FoldballType.Title,
+                        color = FoldballColor.Ink
+                    )
+                }
+            }
+
+            // Club Details Card
+            PaperCard(Modifier.fillMaxWidth(), tilt = FoldballTilt.StatusPanel, ruled = true) {
                 Column(
                     Modifier.padding(FoldballSpace.lg),
-                    verticalArrangement = Arrangement.spacedBy(FoldballSpace.sm)
+                    verticalArrangement = Arrangement.spacedBy(FoldballSpace.md)
                 ) {
                     OutlinedTextField(
                         value = state.name,
@@ -112,7 +150,8 @@ fun TeamSetupScreen(state: TeamUiState, onIntent: (TeamIntent) -> Unit) {
                     )
                 }
             }
-            Text("CHOOSE YOUR BADGE", style = FoldballType.Label, color = FoldballColor.Ink)
+
+            Text("CHOOSE CREST BADGE", style = FoldballType.Label, color = FoldballColor.Ink)
             ClubBadges.ids.chunked(4).forEach { row ->
                 Row(
                     Modifier.fillMaxWidth(),
@@ -126,7 +165,7 @@ fun TeamSetupScreen(state: TeamUiState, onIntent: (TeamIntent) -> Unit) {
                                 role = Role.RadioButton,
                                 onClick = { onIntent(TeamIntent.BadgeSelected(id)) }
                             ),
-                            tilt = FoldballTilt.TapeLabel,
+                            tilt = FoldballTilt.PaperCard,
                             ruled = false,
                             color = if (state.badgeId ==
                                 id
@@ -141,33 +180,32 @@ fun TeamSetupScreen(state: TeamUiState, onIntent: (TeamIntent) -> Unit) {
                                 "Club badge $id",
                                 Modifier.align(
                                     Alignment.Center
-                                ).padding(FoldballSpace.sm).size(56.dp)
+                                ).padding(FoldballSpace.sm).size(52.dp)
                             )
                         }
                     }
                 }
             }
-            Text(
-                "Your opponent gets a different badge every match.",
-                style = FoldballType.Caption,
-                color = FoldballColor.Ink
-            )
-            PaperButton(
-                if (state.saving) {
-                    "Saving…"
-                } else if (state.editing) {
-                    "Save team"
-                } else {
-                    "Continue"
-                },
-                { onIntent(TeamIntent.Save) },
+
+            // Action Buttons
+            Column(
                 Modifier.fillMaxWidth(),
-                enabled = state.canSave
-            )
-            if (state.editing) {
-                PaperButton("Cancel", {
-                    onIntent(TeamIntent.Cancel)
-                }, Modifier.fillMaxWidth(), enabled = !state.saving)
+                verticalArrangement = Arrangement.spacedBy(FoldballSpace.md)
+            ) {
+                PaperButton(
+                    if (state.saving) "Saving…" else "Save Club",
+                    { onIntent(TeamIntent.Save) },
+                    Modifier.fillMaxWidth(),
+                    enabled = state.canSave,
+                    style = PaperButtonStyle.Primary
+                )
+                PaperButton(
+                    "Cancel",
+                    { onIntent(TeamIntent.Cancel) },
+                    Modifier.fillMaxWidth(),
+                    enabled = !state.saving,
+                    style = PaperButtonStyle.Secondary
+                )
             }
         }
     }

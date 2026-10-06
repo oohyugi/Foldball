@@ -7,129 +7,79 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.yogi.foldball.core.ui.theme.CrumpledBall
 import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.PaperCard
 import com.yogi.foldball.gamekit.presentation.player.PaperPlayer
 import com.yogi.foldball.gamekit.presentation.player.PlayerFacing
 
-val FieldStripShape = GenericShape { size, _ ->
-    val w = size.width
-    val h = size.height
-    moveTo(0f, 0.04f * h)
-    lineTo(0.08f * w, 0f)
-    lineTo(0.22f * w, 0.05f * h)
-    lineTo(0.40f * w, 0.01f * h)
-    lineTo(0.58f * w, 0.05f * h)
-    lineTo(0.76f * w, 0f)
-    lineTo(0.92f * w, 0.04f * h)
-    lineTo(w, 0.01f * h)
-    lineTo(w, 0.96f * h)
-    lineTo(0.86f * w, h)
-    lineTo(0.68f * w, 0.95f * h)
-    lineTo(0.50f * w, h)
-    lineTo(0.32f * w, 0.96f * h)
-    lineTo(0.14f * w, h)
-    lineTo(0f, 0.95f * h)
-    close()
-}
-
+/** Decorative portrait-pitch crop, using the same paper standees as Match. */
 @Composable
 fun MenuField(modifier: Modifier = Modifier) {
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(150.dp)
-            .clip(FieldStripShape)
+    PaperCard(
+        modifier = modifier.fillMaxWidth().height(150.dp).clearAndSetSemantics { },
+        tilt = FoldballTilt.StatusPanelAlternate,
+        ruled = false,
+        color = FoldballColor.Grass
     ) {
-        val containerWidth = maxWidth
-        val containerHeight = maxHeight
-
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(Color(0xFF3F8F43))
-
-            val white = Color.White.copy(alpha = 0.9f)
-            val darkGreen = Color(0xFF2F7A34).copy(alpha = 0.5f)
-
-            drawLine(darkGreen, androidx.compose.ui.geometry.Offset(14f * size.width / 340f, 38f * size.height / 150f), androidx.compose.ui.geometry.Offset(80f * size.width / 340f, 22f * size.height / 150f), 2f)
-            drawLine(white, androidx.compose.ui.geometry.Offset(size.width / 2f, 0f), androidx.compose.ui.geometry.Offset(size.width / 2f, size.height), 2f)
-            drawCircle(white, radius = 28.dp.toPx(), center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f), style = Stroke(2f))
-
-            val cardboard = Color(0xFFC99A62)
-            drawCardboard(cardboard, size.width, size.height)
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            Canvas(Modifier.fillMaxSize()) {
+                val rail = 8.dp.toPx()
+                val line = 1.dp.toPx()
+                val markings = FoldballColor.Paper.copy(alpha = .8f)
+                // Quiet paper bands retain contrast beneath the standees.
+                repeat(6) { band ->
+                    if (band % 2 == 0) {
+                        drawRect(
+                            FoldballColor.Paper.copy(alpha = .035f),
+                            Offset(rail, band * size.height / 6f),
+                            Size(size.width - rail * 2, size.height / 6f)
+                        )
+                    }
+                }
+                val left = rail + 8.dp.toPx()
+                val right = size.width - left
+                drawLine(markings, Offset(left, 0f), Offset(left, size.height), line)
+                drawLine(markings, Offset(right, 0f), Offset(right, size.height), line)
+                drawLine(markings, Offset(left, center.y), Offset(right, center.y), line)
+                drawCircle(markings, 26.dp.toPx(), center, style = Stroke(line))
+                drawCircle(markings, 2.dp.toPx(), center)
+                drawRect(FoldballColor.Cardboard, size = Size(rail, size.height))
+                drawRect(FoldballColor.Cardboard, Offset(size.width - rail, 0f), Size(rail, size.height))
+                drawLine(FoldballColor.ShadowBrown.copy(alpha = .4f), Offset(rail, 0f), Offset(rail, size.height), line)
+                drawLine(FoldballColor.ShadowBrown.copy(alpha = .4f), Offset(size.width - rail, 0f), Offset(size.width - rail, size.height), line)
+            }
+            val playerSize = 52.dp
+            val positions = listOf(
+                Triple(.28f, .27f, "9" to "GALIH"),
+                Triple(.72f, .27f, "7" to "EKO"),
+                Triple(.28f, .73f, "10" to "YOGI"),
+                Triple(.72f, .73f, "8" to "BUDI")
+            )
+            positions.forEachIndexed { index, (x, y, identity) ->
+                val blue = index < 2
+                PaperPlayer(
+                    modifier = Modifier
+                        .offset(maxWidth * x - playerSize / 2, maxHeight * y - playerSize / 2)
+                        .size(playerSize)
+                        .graphicsLayer(rotationZ = if (index % 2 == 0) -2f else 2f),
+                    facing = if (blue) PlayerFacing.FRONT else PlayerFacing.BACK,
+                    jerseyColor = if (blue) FoldballColor.InkBlue else FoldballColor.TeamRed,
+                    number = identity.first,
+                    name = identity.second
+                )
+            }
+            CrumpledBall(modifier = Modifier.align(Alignment.Center), size = 28.dp)
         }
-
-        fun xOffset(x: Int) = (x / 340f) * containerWidth.value
-        fun yOffset(y: Int) = (y / 150f) * containerHeight.value
-
-        val playerWidth = 44.dp
-        val playerHeight = 52.dp
-
-        // Player 1: Blue (GALIH, 9) at top-left
-        PaperPlayer(
-            modifier = Modifier
-                .size(playerWidth, playerHeight)
-                .offset(x = (xOffset(98) - playerWidth.value / 2).dp, y = (yOffset(60) - playerHeight.value / 2).dp)
-                .graphicsLayer(rotationZ = -3f),
-            facing = PlayerFacing.BACK,
-            jerseyColor = FoldballColor.InkBlue,
-            number = "9",
-            name = "GALIH"
-        )
-
-        // Player 2: Blue (EKO, 7) at top-right
-        PaperPlayer(
-            modifier = Modifier
-                .size(playerWidth, playerHeight)
-                .offset(x = (xOffset(242) - playerWidth.value / 2).dp, y = (yOffset(56) - playerHeight.value / 2).dp)
-                .graphicsLayer(rotationZ = 2f),
-            facing = PlayerFacing.BACK,
-            jerseyColor = FoldballColor.InkBlue,
-            number = "7",
-            name = "EKO"
-        )
-
-        // Player 3: Red (YOGI, 10) at bottom-left
-        PaperPlayer(
-            modifier = Modifier
-                .size(playerWidth, playerHeight)
-                .offset(x = (xOffset(104) - playerWidth.value / 2).dp, y = (yOffset(140) - playerHeight.value / 2).dp)
-                .graphicsLayer(rotationZ = 2f),
-            facing = PlayerFacing.FRONT,
-            jerseyColor = FoldballColor.TeamRed,
-            number = "10",
-            name = "YOGI"
-        )
-
-        // Player 4: Red (BUDI, 8) at bottom-right
-        PaperPlayer(
-            modifier = Modifier
-                .size(playerWidth, playerHeight)
-                .offset(x = (xOffset(238) - playerWidth.value / 2).dp, y = (yOffset(138) - playerHeight.value / 2).dp)
-                .graphicsLayer(rotationZ = -2f),
-            facing = PlayerFacing.FRONT,
-            jerseyColor = FoldballColor.TeamRed,
-            number = "8",
-            name = "BUDI"
-        )
-
-        CrumpledBall(
-            modifier = Modifier.align(Alignment.Center),
-            size = 32.dp
-        )
     }
-}
-
-private fun DrawScope.drawCardboard(cardboard: Color, width: Float, height: Float) {
-    drawRect(cardboard, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Size(14f, height))
-    drawRect(cardboard, androidx.compose.ui.geometry.Offset(width - 14f, 0f), androidx.compose.ui.geometry.Size(14f, height))
 }

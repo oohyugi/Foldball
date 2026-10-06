@@ -47,6 +47,8 @@ kotlin {
             implementation(libs.compose.uiTooling)
         }
         commonMain.dependencies {
+            implementation(libs.navigation.compose)
+            implementation(libs.navigationevent.compose)
             implementation(libs.datastore.preferences)
             api(libs.koin.core)
             implementation(libs.koin.composeViewmodel)
