@@ -99,7 +99,7 @@ class GameEngineFlowTest {
 
     @Test
     fun highlightedZoneCanBeEnteredWhenItsCenterIsBlocked() {
-        for (blockerX in listOf(145f, 170f)) {
+        for (blockerX in listOf(145f, 170f)) for (incremental in listOf(false, true)) {
             val engine = GameEngine(393f, 580f, targetScore = null)
             val playerField = GameEngine::class.java.getDeclaredField("players")
             playerField.isAccessible = true
@@ -116,11 +116,49 @@ class GameEngineFlowTest {
             val preview = engine.legalPlayerPositionInZone("blue-left", 14)
             assertTrue(preview != null)
             engine.beginPlayerMove("blue-left")
-            engine.moveInactivePlayer("blue-left", Vector2(131f, 0f)) // Finger goes to zone 14 center.
+            // Both a large pointer event and a sequence of smaller events must
+            // settle at the highlighted safe point when the center is obstructed.
+            repeat(if (incremental) 131 else 1) {
+                engine.moveInactivePlayer("blue-left", Vector2(if (incremental) 1f else 131f, 0f))
+            }
             val moved = engine.snapshot.players.first { it.id == "blue-left" }.position
-            assertEquals(preview, moved)
+            if (!incremental) assertEquals(preview, moved)
+            // After entering the safe edge, further legal pointer events may
+            // move freely within the target zone rather than staying snapped.
+            assertTrue(moved.x in 131f..262f && moved.y in (580f / 6f)..(580f / 3f))
             assertTrue((moved - Vector2(blockerX, 205f)).length() >= 68f)
+            engine.endPlayerMove("blue-left")
+            assertEquals(1, engine.defensiveMovesUsed)
+            assertTrue(!engine.canMovePlayer("blue-left"))
+            assertTrue(engine.undoLastPlayerMove())
+            assertEquals(Vector2(65f, 145f), engine.snapshot.players.first { it.id == "blue-left" }.position)
         }
+    }
+
+    @Test
+    fun clearDragTargetInHighlightedZoneFollowsPointerInsteadOfSnapping() {
+        val engine = GameEngine(393f, 580f, targetScore = null)
+        val players = GameEngine::class.java.getDeclaredField("players").apply { isAccessible = true }
+        players.set(engine, engine.snapshot.players.map { player ->
+            val position = when (player.id) {
+                "blue-left" -> Vector2(65f, 145f)
+                "blue-striker" -> Vector2(170f, 205f)
+                "blue-center" -> Vector2(327f, 80f)
+                else -> player.position
+            }
+            player.copy(position = position, home = position)
+        })
+        val safePreview = engine.legalPlayerPositionInZone("blue-left", 14)
+        assertTrue(safePreview != null)
+        val pointerTarget = Vector2(196f, 115f)
+        assertTrue(safePreview != pointerTarget)
+        engine.beginPlayerMove("blue-left")
+        engine.moveInactivePlayer("blue-left", Vector2(65f, -15f))
+        engine.moveInactivePlayer("blue-left", Vector2(66f, -15f))
+        assertEquals(pointerTarget, engine.snapshot.players.first { it.id == "blue-left" }.position)
+        assertEquals(0, engine.defensiveMovesUsed, "Movement is committed only when released")
+        engine.endPlayerMove("blue-left")
+        assertEquals(1, engine.defensiveMovesUsed)
     }
 
     @Test

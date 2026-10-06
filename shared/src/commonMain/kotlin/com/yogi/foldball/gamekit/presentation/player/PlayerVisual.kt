@@ -107,10 +107,11 @@ fun PaperPlayer(
         if (isFocused || isFormation) {
             Canvas(Modifier.fillMaxSize()) {
                 val focusPad = Path().apply {
-                    moveTo(size.width * .20f, size.height * .72f)
-                    lineTo(size.width * .80f, size.height * .72f)
-                    lineTo(size.width * .72f, size.height * .93f)
-                    lineTo(size.width * .28f, size.height * .93f)
+                    fun focusY(fraction: Float) = size.height * if (facing == PlayerFacing.FRONT) 1f - fraction else fraction
+                    moveTo(size.width * .20f, focusY(.72f))
+                    lineTo(size.width * .80f, focusY(.72f))
+                    lineTo(size.width * .72f, focusY(.93f))
+                    lineTo(size.width * .28f, focusY(.93f))
                     close()
                 }
                 if (isFocused) {

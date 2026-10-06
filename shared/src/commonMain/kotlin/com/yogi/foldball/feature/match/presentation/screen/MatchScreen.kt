@@ -1,5 +1,12 @@
 package com.yogi.foldball.feature.match.presentation.screen
 
+import com.yogi.foldball.domain.game.bot.ShotPowerMeter
+import com.yogi.foldball.domain.game.bot.BotStyle
+import com.yogi.foldball.domain.game.bot.BotAimExecution
+import com.yogi.foldball.core.audio.LocalGameAudio
+import com.yogi.foldball.core.audio.SoundDispatcher
+import com.yogi.foldball.core.ui.theme.PaperToggle
+
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
@@ -46,6 +53,9 @@ import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
+import com.yogi.foldball.domain.game.engine.GoalGeometry
+import com.yogi.foldball.domain.game.engine.TeamIdentity
+import com.yogi.foldball.domain.game.engine.withRandomAiOpponent
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.feature.match.presentation.components.MatchStatusPanel
 import com.yogi.foldball.feature.match.presentation.components.OpeningTossOverlay
@@ -74,49 +84,73 @@ import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.home_desk_classroom
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.yogi.foldball.domain.game.bot.BotDifficulty
+import com.yogi.foldball.domain.game.bot.BotPlanner
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 
-private const val powerMeterCycleSeconds = 1.8f
-private const val minimumTimingPower = .05f
+private const val minimumTimingPower = ShotPowerMeter.minimum
 private const val formationOpponentAlpha = .68f
 
 @Composable
 fun MatchSandboxScreen(
     timing: MatchTimingConfig = MatchTimingConfig(),
     teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
-) = MatchExperienceScreen(fullMatch = false, timing = timing, teamConfiguration = teamConfiguration)
+) = MatchExperienceScreen(fullMatch = false, timing = timing, baseTeamConfiguration = teamConfiguration)
 
 @Composable
 fun FullMatchScreen(
+    playAgainstBot: Boolean = true,
+    botDifficulty: BotDifficulty = BotDifficulty.MEDIUM,
+    botStyle: BotStyle = BotStyle.BALANCED,
     timing: MatchTimingConfig = MatchTimingConfig(),
     teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
     onOpenTools: (String) -> Unit,
 ) = MatchExperienceScreen(
     fullMatch = true,
+    playAgainstBot = playAgainstBot,
+    botDifficulty = botDifficulty,
+    botStyle = botStyle,
     timing = timing,
-    teamConfiguration = teamConfiguration,
+    baseTeamConfiguration = teamConfiguration,
     onOpenTools = onOpenTools,
 )
 
 @Composable
 private fun MatchExperienceScreen(
     fullMatch: Boolean,
+    playAgainstBot: Boolean = false,
+    botDifficulty: BotDifficulty = BotDifficulty.MEDIUM,
+    botStyle: BotStyle = BotStyle.BALANCED,
     timing: MatchTimingConfig,
-    teamConfiguration: MatchTeamConfiguration,
+    baseTeamConfiguration: MatchTeamConfiguration,
     onOpenTools: (String) -> Unit = {},
 ) {
     val density = LocalDensity.current.density
     val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val playerMotion = rememberPlayerMotionState()
+    val audio = LocalGameAudio.current
     var isPaused by remember { mutableStateOf(false) }
     var isMatchFinished by remember { mutableStateOf(false) }
     var matchKey by remember { mutableIntStateOf(0) }
+    val teamConfiguration = remember(matchKey, fullMatch, playAgainstBot, baseTeamConfiguration) {
+        when {
+            fullMatch && playAgainstBot -> baseTeamConfiguration.copy(red = TeamIdentity("Player", "PLYR")).withRandomAiOpponent()
+            fullMatch -> baseTeamConfiguration.copy(red = TeamIdentity("Player 1", "P1"), blue = TeamIdentity("Player 2", "P2"))
+            else -> baseTeamConfiguration
+        }
+    }
+    var lastWhistledKickoffScore by remember(matchKey) { mutableStateOf(-1) }
     var openingKickoffTeam by remember(matchKey) {
         mutableStateOf<GameTeam?>(if (fullMatch) null else GameTeam.RED)
     }
@@ -206,6 +240,38 @@ private fun MatchExperienceScreen(
                 )
             }
             var state by remember(engine) { mutableStateOf(engine.snapshot) }
+            val soundDispatcher = remember(engine) { SoundDispatcher(state.soundEvents) }
+            LaunchedEffect(engine, state.phase, openingKickoffTeam) {
+                val score = state.redScore + state.blueScore
+                if (fullMatch && openingKickoffTeam != null && state.phase == GamePhase.DEFENDING &&
+                    score != lastWhistledKickoffScore) {
+                    lastWhistledKickoffScore = score
+                    audio?.play("kickoff", .5f)
+                }
+            }
+
+            LaunchedEffect(engine, state.phase) {
+                if (fullMatch && state.phase == GamePhase.MATCH_OVER) {
+                    audio?.playMatchEnd(
+                        lostAgainstAi = playAgainstBot && state.winner == GameTeam.BLUE,
+                        wonAgainstAi = playAgainstBot && state.winner == GameTeam.RED,
+                    )
+                }
+            }
+
+            LaunchedEffect(engine, state.soundEvents, isPaused) {
+                var goalPlayed = false
+                soundDispatcher.dispatch(state, audioClock.elapsedNow().inWholeMilliseconds, !isPaused && audio?.enabled == true && audio.foreground) { name, volume ->
+                    audio?.play(name, volume)
+                    if (name == "goal") goalPlayed = true
+                }
+                if (isPaused) audio?.stop()
+                if (goalPlayed) audio?.playGoalCheer()
+            }
+            DisposableEffect(engine) { onDispose { audio?.stop() } }
+
+            val bot = remember(engine, botDifficulty, botStyle) { BotPlanner(botDifficulty, style = botStyle) }
+            val botTurn = fullMatch && playAgainstBot && bot.controls(state, GameTeam.BLUE)
             val formationOpen = state.phase == GamePhase.DEFENDING && state.phaseTimeRemaining > 0f
             var previousHapticPhase by remember(engine) { mutableStateOf(state.phase) }
             val goalShake = remember(engine) { Animatable(0f) }
@@ -215,6 +281,7 @@ private fun MatchExperienceScreen(
             var selectedFormationPlayerId by remember(engine) { mutableStateOf<String?>(null) }
             var showAimGuide by remember(engine) { mutableStateOf(false) }
             var isPowerTiming by remember(engine) { mutableStateOf(false) }
+            var powerTimingElapsed by remember(engine) { mutableFloatStateOf(0f) }
             LaunchedEffect(state.phase, formationOpen) {
                 val oldPhase = previousHapticPhase
                 if (oldPhase != state.phase) {
@@ -324,6 +391,75 @@ private fun MatchExperienceScreen(
                 }
             }
 
+            LaunchedEffect(engine, bot, playAgainstBot, state.phase, state.focusedPlayerId, isPaused, openingKickoffTeam) {
+                if (!fullMatch || !playAgainstBot || isPaused || openingKickoffTeam == null || !botTurn) return@LaunchedEffect
+                val thinkMillis = kotlin.random.Random.nextLong(1100, 2600)
+                delay(minOf(thinkMillis, ((engine.snapshot.phaseTimeRemaining - 2.2f) * 1000).toLong().coerceAtLeast(0L)))
+                if (engine.snapshot.phase == GamePhase.DEFENDING) {
+                    val planningEngine = engine.copyForSimulation()
+                    val moves = withContext(Dispatchers.Default) {
+                        bot.chooseDefensePlan(planningEngine, GameTeam.BLUE)
+                    }
+                    val plannedMoves = if (botDifficulty != BotDifficulty.HARD && moves.size > 1 && kotlin.random.Random.nextFloat() < .2f) moves.take(1) else moves
+                    for (move in plannedMoves) {
+                        if (engine.snapshot.phase != GamePhase.DEFENDING) break
+                        engine.movePlayerToZone(move.playerId, move.zone)
+                        refresh()
+                        delay(minOf(kotlin.random.Random.nextLong(400, 850), ((engine.snapshot.phaseTimeRemaining - .3f) * 1000).toLong().coerceAtLeast(0L)))
+                    }
+                    engine.finishDefense()
+                    refresh()
+                } else if (engine.snapshot.phase == GamePhase.AIMING) {
+                    val planningEngine = engine.copyForSimulation()
+                    val shot = withContext(Dispatchers.Default) { bot.chooseShot(planningEngine) }
+                    if (engine.snapshot.phase == GamePhase.AIMING && bot.controls(engine.snapshot, GameTeam.BLUE)) {
+                        val target = BotAimExecution.target(shot, botDifficulty)
+                        isPowerTiming = false
+                        val startingAngle = engine.snapshot.aimAngle
+                        val consideredAngle = bot.alternativeShot?.angle?.takeIf { kotlin.random.Random.nextFloat() < .25f }
+                        val overshoot = if (kotlin.random.Random.nextBoolean()) .025f else -.025f
+                        val aimSeconds = minOf(1.05f, (engine.snapshot.phaseTimeRemaining - 1.1f).coerceAtLeast(.05f))
+                        var elapsed = 0f
+                        var previousFrame = withFrameNanos { it }
+                        while (elapsed < aimSeconds && engine.currentPhase == GamePhase.AIMING) {
+                            val now = withFrameNanos { it }
+                            elapsed += (now - previousFrame) / 1_000_000_000f
+                            previousFrame = now
+                            val progress = (elapsed / aimSeconds).coerceIn(0f, 1f)
+                            val smooth = progress * progress * (3f - 2f * progress)
+                            val hesitation = kotlin.math.sin(progress * kotlin.math.PI.toFloat()) * overshoot
+                            val aimedAngle = if (consideredAngle != null && progress < .3f) {
+                                startingAngle + (consideredAngle - startingAngle) * (progress / .3f)
+                            } else if (consideredAngle != null) {
+                                val correction = ((progress - .3f) / .7f).coerceIn(0f, 1f)
+                                consideredAngle + (target.angle - consideredAngle) * correction * correction * (3f - 2f * correction)
+                            } else startingAngle + (target.angle - startingAngle) * smooth
+                            engine.setAimAngle(aimedAngle + hesitation)
+                            playerMotion.setAimAngle(engine.snapshot.aimAngle)
+                            refresh()
+                        }
+                        if (engine.currentPhase == GamePhase.AIMING) {
+                            engine.setPower(minimumTimingPower)
+                            refresh()
+                            powerTimingElapsed = 0f
+                            val releaseAt = BotAimExecution.releaseTime(target.power, botDifficulty)
+                            isPowerTiming = true
+                            try {
+                                playerMotion.startPowerCharge()
+                                while (engine.currentPhase == GamePhase.AIMING &&
+                                    powerTimingElapsed < releaseAt && engine.snapshot.phaseTimeRemaining > .12f) {
+                                    withFrameNanos { }
+                                }
+                            } finally {
+                                isPowerTiming = false
+                            }
+                            if (engine.snapshot.focusedPlayerId == planningEngine.snapshot.focusedPlayerId &&
+                                engine.currentPhase == GamePhase.AIMING) shoot()
+                        }
+                    }
+                }
+            }
+
             LaunchedEffect(engine, isPowerTiming, isPaused) {
                 if (isPowerTiming && !isPaused && engine.snapshot.phase == GamePhase.AIMING) {
                     var previous = 0L
@@ -334,13 +470,8 @@ private fun MatchExperienceScreen(
                             elapsedSeconds += (now - previous) / 1_000_000_000f
                         }
                         previous = now
-                        val cyclePosition = (elapsedSeconds / powerMeterCycleSeconds) % 1f
-                        val meterProgress = if (cyclePosition <= .5f) {
-                            cyclePosition * 2f
-                        } else {
-                            (1f - cyclePosition) * 2f
-                        }
-                        val power = minimumTimingPower + (1f - minimumTimingPower) * meterProgress
+                        powerTimingElapsed = elapsedSeconds
+                        val power = ShotPowerMeter.powerAt(elapsedSeconds)
                         engine.setPower(power)
                         playerMotion.setPowerProgress(power)
                         state = engine.snapshot
@@ -358,7 +489,14 @@ private fun MatchExperienceScreen(
                 val turnTeam = if (state.phase == GamePhase.DEFENDING) {
                     if (possessionTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
                 } else possessionTeam
-                val turnLabel = when (state.phase) {
+                val localTwoPlayers = fullMatch && !playAgainstBot
+                val turnName = teamConfiguration.forTeam(turnTeam).name
+                val turnLabel = when {
+                    localTwoPlayers && state.phase == GamePhase.DEFENDING ->
+                        "$turnName TURN · DEFEND" + if (state.openingKickoffPending) " · OWN HALF" else ""
+                    localTwoPlayers && state.phase == GamePhase.AIMING -> "$turnName TURN · KICK"
+                    localTwoPlayers && state.phase == GamePhase.KICKER_APPROACH -> "UP NEXT · $turnName"
+                    else -> when (state.phase) {
                     GamePhase.DEFENDING -> if (state.openingKickoffPending) {
                         "FORMATION · ${teamConfiguration.forTeam(turnTeam).name} · OWN HALF"
                     } else {
@@ -370,9 +508,11 @@ private fun MatchExperienceScreen(
                     GamePhase.TURNOVER_RETREAT -> "TURNOVER · ${teamConfiguration.forTeam(possessionTeam).name}"
                     GamePhase.GOAL -> "GOAL · ${state.lastScoringTeam?.let { teamConfiguration.forTeam(it).name }.orEmpty()}"
                     GamePhase.MATCH_OVER -> "MATCH COMPLETE"
+                    }
                 }
                 if (!(fullMatch && openingKickoffTeam == null)) {
-                    TapeLabel(turnLabel, Modifier.align(Alignment.CenterHorizontally))
+                    TapeLabel(turnLabel, Modifier.align(Alignment.CenterHorizontally)
+                        .semantics { liveRegion = LiveRegionMode.Polite })
                 }
                 ClassroomStadium(
                     fieldWidthDp = fieldWidth,
@@ -486,7 +626,7 @@ private fun MatchExperienceScreen(
 
                     state.players.forEach { player ->
                         val focused = player.id == state.focusedPlayerId
-                        val canMove = engine.canMovePlayer(player.id)
+                        val canMove = !botTurn && engine.canMovePlayer(player.id)
                         val isKicking = player.id == kickingPlayerId
                         val showFocus = focused && (
                             state.phase == GamePhase.KICKER_APPROACH || state.phase == GamePhase.AIMING
@@ -506,6 +646,10 @@ private fun MatchExperienceScreen(
                             targetValue = player.position.y.dp,
                             animationSpec = if (movingPlayerId == player.id) snap() else spring(dampingRatio = .92f, stiffness = 1200f),
                         )
+                        // FRONT's lower contact edge is inset more than BACK's upper fold.
+                        // Align their visible kicking gap without moving engine positions/hitboxes.
+                        val kickerVisualOffsetY = if (player.team == GameTeam.BLUE && ((focused &&
+                            state.phase in listOf(GamePhase.KICKER_APPROACH, GamePhase.DEFENDING, GamePhase.AIMING)) || isKicking)) playerSize * .086f else 0.dp
                         val kickProgress = if (isKicking) playerMotion.kickProgress else 0f
                         val kickDirectionY = if (player.team == GameTeam.RED) -1f else 1f
                         val targetPlayerAlpha = when (state.phase) {
@@ -520,7 +664,7 @@ private fun MatchExperienceScreen(
                         PaperPlayer(
                             modifier = Modifier.offset(
                                 displayedX - playerSize / 2 + 8.dp * (sin(visualAimAngle) * kickProgress),
-                                displayedY - playerSize / 2 + 20.dp * (kickDirectionY * cos(visualAimAngle) * kickProgress),
+                                displayedY - playerSize / 2 + kickerVisualOffsetY + 20.dp * (kickDirectionY * cos(visualAimAngle) * kickProgress),
                             )
                                 .size(playerSize)
                                 .graphicsLayer { alpha = playerAlpha }
@@ -529,7 +673,7 @@ private fun MatchExperienceScreen(
                                         formationOpen && player.team == turnTeam,
                                     onClick = { selectedFormationPlayerId = player.id },
                                 )
-                                .pointerInput(player.id, focused, formationOpen, isPaused, turnTeam, canMove) {
+                                .pointerInput(player.id, focused, formationOpen, isPaused, turnTeam, canMove, botTurn) {
                                     if (!focused && canMove && !isPaused && formationOpen && player.team == turnTeam) {
                                         detectDragGestures(
                                             onDragStart = {
@@ -562,7 +706,7 @@ private fun MatchExperienceScreen(
                                             engine.moveInactivePlayer(player.id, Vector2(drag.x / density, drag.y / density))
                                             refresh()
                                         }
-                                    } else if (focused && !isPaused && state.phase == GamePhase.AIMING) {
+                                    } else if (focused && !isPaused && !botTurn && state.phase == GamePhase.AIMING) {
                                         detectDragGestures(
                                             onDragStart = {
                                                 showAimGuide = true
@@ -609,13 +753,18 @@ private fun MatchExperienceScreen(
                             impactStrength = player.impactStrength,
                             inactiveAlpha = 1f,
                             jerseyColor = if (player.team == GameTeam.RED) FoldballColor.TeamRed else FoldballColor.InkBlue,
-                            number = player.jerseyNumber.toString(),
+                            number = when (player.id.substringAfter("-")) {
+                                "center" -> "1"
+                                "left" -> "2"
+                                "right" -> "3"
+                                else -> "9"
+                            },
                             name = teamConfiguration.forTeam(player.team).jerseyLabel,
                         )
                     }
 
                     val ballSpeed = (state.ball.velocity.length() / 670f).coerceIn(0f, 1f)
-                    val ballLift = (state.ball.height / 36f).coerceIn(0f, 1f)
+                    val ballLift = (state.ball.height / GoalGeometry.openingHeight).coerceIn(0f, 1f)
                     val groundContact = (1f - state.ball.height / 5f).coerceIn(0f, 1f)
                     val shadowWidth = 15.dp + 15.dp * ballLift
                     val shadowHeight = 3.dp + 4.dp * ballLift
@@ -778,6 +927,7 @@ private fun MatchExperienceScreen(
                     }
                     val ballStretch = (state.ball.velocity.length() / 700f).coerceIn(0f, .08f)
                     val airborneScale = ballLift * .08f
+                    val visualBallLift = GoalGeometry.visualLift(state.ball.height).dp
                     val ballVisualSize = MatchBallVisualSize
                     PaperBall(
                         rotationX = state.ball.rotationX,
@@ -789,7 +939,7 @@ private fun MatchExperienceScreen(
                         impactStrength = state.ball.impactStrength,
                         modifier = Modifier.offset(
                             state.ball.position.x.dp - ballVisualSize / 2,
-                            state.ball.position.y.dp - ballVisualSize / 2,
+                            state.ball.position.y.dp - ballVisualSize / 2 - visualBallLift,
                         ).size(ballVisualSize),
                     )
 
@@ -813,7 +963,9 @@ private fun MatchExperienceScreen(
                     MatchStatusPanel(
                         snapshot = state,
                         defensiveMovesUsed = engine.defensiveMovesUsed,
-                        canUndo = engine.canUndoPlayerMove(),
+                        canUndo = !botTurn && engine.canUndoPlayerMove(),
+                        isBotTurn = botTurn,
+                        localTwoPlayers = fullMatch && !playAgainstBot,
                         isPaused = isPaused,
                         showPower = !fullMatch,
                         teamConfiguration = teamConfiguration,
@@ -837,6 +989,7 @@ private fun MatchExperienceScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
+                            audio?.let { PaperToggle("Sound effects", it.enabled, it::changeEnabled, Modifier.fillMaxWidth()) }
                             Text("MATCH PAUSED", style = FoldballType.Title, color = FoldballColor.Ink)
                             PaperButton("Resume", { showMatchMenu = false; isPaused = false }, Modifier.fillMaxWidth())
                             PaperButton("Match summary", { showMatchMenu = false; showShareSummary = true; isPaused = false }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Secondary)
@@ -861,13 +1014,14 @@ private fun MatchExperienceScreen(
                         onOpenTools("home")
                     },
                     dismissText = "Keep playing",
+                    stackedActions = true,
                     danger = true,
                 )
             }
             if (showShareSummary) {
                 PaperDialog(
                     title = "MATCH SUMMARY",
-                    message = "${teamConfiguration.forTeam(GameTeam.BLUE).jerseyLabel} $blueScore – $redScore ${teamConfiguration.forTeam(GameTeam.RED).jerseyLabel}\n${matchElapsedSeconds / 60}:${
+                    message = "${teamConfiguration.forTeam(GameTeam.RED).name} $redScore – $blueScore ${teamConfiguration.forTeam(GameTeam.BLUE).name}\n${matchElapsedSeconds / 60}:${
                         (matchElapsedSeconds % 60).toString().padStart(2, '0')
                     } · FIRST TO 3",
                     onDismiss = { showShareSummary = false },
@@ -880,7 +1034,7 @@ private fun MatchExperienceScreen(
                 val winningTeam = state.winner
                 PaperDialog(
                     title = "MATCH COMPLETE",
-                    message = "TEAM ${winningTeam?.let { teamConfiguration.forTeam(it).name }} WINS\n${teamConfiguration.forTeam(GameTeam.BLUE).jerseyLabel} ${state.blueScore} – ${state.redScore} ${teamConfiguration.forTeam(GameTeam.RED).jerseyLabel}",
+                    message = "TEAM ${winningTeam?.let { teamConfiguration.forTeam(it).name }} WINS\n${teamConfiguration.forTeam(GameTeam.RED).name} ${state.redScore} – ${state.blueScore} ${teamConfiguration.forTeam(GameTeam.BLUE).name}",
                     confirmText = "Play again",
                     onConfirm = {
                             matchKey += 1
@@ -898,3 +1052,5 @@ private fun MatchExperienceScreen(
         }
     }
 }
+
+private val audioClock = kotlin.time.TimeSource.Monotonic.markNow()

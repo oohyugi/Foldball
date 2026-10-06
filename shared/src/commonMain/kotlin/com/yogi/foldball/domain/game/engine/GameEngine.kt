@@ -38,7 +38,6 @@ data class MatchPlayer(
     val impactDirectionX: Float = 0f,
     val impactDirectionY: Float = 0f,
     val impactStrength: Float = 0f,
-    val jerseyNumber: Int = 0,
 )
 
 data class MatchBall(
@@ -56,6 +55,8 @@ data class MatchBall(
     val goalPostImpactStrength: Float = 0f,
 )
 
+data class SoundEvents(val kicks: Int = 0, val impacts: Int = 0, val bounces: Int = 0, val posts: Int = 0, val goals: Int = 0)
+
 data class GameSnapshot(
     val players: List<MatchPlayer>,
     val ball: MatchBall,
@@ -72,6 +73,7 @@ data class GameSnapshot(
     val winner: GameTeam?,
     val openingKickoffPending: Boolean,
     val lastShotPower: Float,
+    val soundEvents: SoundEvents = SoundEvents(),
 )
 
 private data class PlayerCollision(
@@ -89,7 +91,7 @@ private data class BallMotion(
     val verticalVelocity: Float,
 )
 
-private data class GoalLineCrossing(val team: GameTeam, val lineY: Float, val x: Float)
+private data class GoalLineCrossing(val team: GameTeam, val lineY: Float, val x: Float, val ballHeight: Float)
 
 /** Deterministic, platform-independent movement and ball physics for the match feature. */
 class GameEngine(
@@ -125,7 +127,7 @@ class GameEngine(
     private val maxPlayerImpactHopSpeed = 280f
     private val groundBounceRestitution = .18f
     private val wallBounceRestitution = .45f
-    private val wallTangentialRetention = .82f
+    private val wallTangentialRetention = .72f
     private val kickerVisualGap = 1f
     private val playerCollisionDistance = ballRadius + playerRadius + playerCollisionOverlap
     private val possessionTieThreshold = 6f
@@ -138,14 +140,14 @@ class GameEngine(
     private val retreatDuration = .4f
 
     private var players = listOf(
-        player("red-left", GameTeam.RED, 4, jerseyNumber = 2, offsetTowardAttackRows = .2f),
-        player("red-center", GameTeam.RED, 2, jerseyNumber = 1, offsetTowardAttackRows = .33f),
-        player("red-right", GameTeam.RED, 6, jerseyNumber = 3, offsetTowardAttackRows = .2f),
-        player("red-striker", GameTeam.RED, 8, jerseyNumber = 9),
-        player("blue-left", GameTeam.BLUE, 13, jerseyNumber = 2, offsetTowardAttackRows = .2f),
-        player("blue-center", GameTeam.BLUE, 17, jerseyNumber = 1, offsetTowardAttackRows = .33f),
-        player("blue-right", GameTeam.BLUE, 15, jerseyNumber = 3, offsetTowardAttackRows = .2f),
-        player("blue-striker", GameTeam.BLUE, 11, jerseyNumber = 9),
+        player("red-left", GameTeam.RED, 4, offsetTowardAttackRows = .2f),
+        player("red-center", GameTeam.RED, 2, offsetTowardAttackRows = .33f),
+        player("red-right", GameTeam.RED, 6, offsetTowardAttackRows = .2f),
+        player("red-striker", GameTeam.RED, 8),
+        player("blue-left", GameTeam.BLUE, 13, offsetTowardAttackRows = .2f),
+        player("blue-center", GameTeam.BLUE, 17, offsetTowardAttackRows = .33f),
+        player("blue-right", GameTeam.BLUE, 15, offsetTowardAttackRows = .2f),
+        player("blue-striker", GameTeam.BLUE, 11),
     )
     // Immutable formation anchors. A player's mutable home follows defensive moves
     // during a rally, but every kickoff starts from these original positions.
@@ -157,6 +159,7 @@ class GameEngine(
     private var lastKickingTeam: GameTeam? = null
     private var aimAngle = 0f
     private var power = 0f
+    private var soundEvents = SoundEvents()
     private var lastShotPower = 0f
     private var redScore = 0
     private var blueScore = 0
@@ -196,6 +199,67 @@ class GameEngine(
         moveFocusedBehindBall()
     }
 
+    /** Independent copy for bot planning; immutable player/ball values may be shared. */
+    fun copyForSimulation(): GameEngine {
+        val copy = GameEngine(width, height, targetScore, timing, kickoffTeam)
+        copy.players = players
+        copy.ball = ball
+        copy.phase = phase
+        copy.phaseTimeRemaining = phaseTimeRemaining
+        copy.focusedPlayerId = focusedPlayerId
+        copy.lastKickingTeam = lastKickingTeam
+        copy.aimAngle = aimAngle
+        copy.power = power
+        copy.soundEvents = soundEvents
+        copy.lastShotPower = lastShotPower
+        copy.redScore = redScore
+        copy.blueScore = blueScore
+        copy.lastScoringTeam = lastScoringTeam
+        copy.kickoffTeam = kickoffTeam
+        copy.openingKickoffPending = openingKickoffPending
+        copy.winner = winner
+        copy.goalCelebrationElapsed = goalCelebrationElapsed
+        copy.approachFrom = approachFrom
+        copy.approachTo = approachTo
+        copy.approachBallFrom = approachBallFrom
+        copy.approachBallTo = approachBallTo
+        copy.approachElapsed = approachElapsed
+        copy.retreatFrom = retreatFrom
+        copy.retreatTo = retreatTo
+        copy.retreatElapsed = retreatElapsed
+        copy.turnoverNextKickerId = turnoverNextKickerId
+        copy.shotKickerAnchor = shotKickerAnchor
+        copy.playerDragId = playerDragId
+        copy.playerDragStart = playerDragStart
+        copy.playerDragStartState = playerDragStartState
+        copy.playerDragDelta = playerDragDelta
+        copy.playerDragStartZone = playerDragStartZone
+        copy.contactCooldownByPlayerId.putAll(contactCooldownByPlayerId)
+        copy.playersMovedThisTurn.addAll(playersMovedThisTurn)
+        copy.defensiveMoveHistory.addAll(defensiveMoveHistory)
+        return copy
+    }
+
+    val ballWallContactX: Float get() = wallInset + ballRadius
+    val fieldWidth: Float get() = width
+    val fieldHeight: Float get() = height
+
+    fun setAimAngle(value: Float) {
+        if (phase == GamePhase.AIMING) aimAngle = value.coerceIn(-1.05f, 1.05f)
+    }
+
+    /** Use the same reachable destination and move accounting as a human drag. */
+    fun movePlayerToZone(id: String, zone: Int): Boolean {
+        if (!isAdjacentZoneForPlayer(id, zone)) return false
+        val destination = legalPlayerPositionInZone(id, zone) ?: return false
+        val before = defensiveMovesUsed
+        val origin = players.first { it.id == id }.position
+        beginPlayerMove(id)
+        moveInactivePlayer(id, destination - origin)
+        endPlayerMove(id)
+        return defensiveMovesUsed > before
+    }
+
     val snapshot: GameSnapshot
         get() = GameSnapshot(
             players = players.toList(),
@@ -217,6 +281,7 @@ class GameEngine(
             winner = winner,
             openingKickoffPending = openingKickoffPending,
             lastShotPower = lastShotPower,
+            soundEvents = soundEvents,
         )
 
     fun beginPlayerMove(id: String) {
@@ -246,6 +311,7 @@ class GameEngine(
         // A zone can have a reachable safe edge while its center is obstructed.
         // When the finger enters that zone, settle on the reachable spot advertised
         // by the overlay instead of leaving the player stuck at the boundary.
+        // Reaching the zone edge is not enough when the finger's target is blocked.
         val destinationZone = zoneAt(proposed)
         if (destinationZone != null && destinationZone != playerDragStartZone &&
             (zoneAt(safe) != destinationZone || !isLegalPlayerDragPosition(id, proposed))
@@ -386,6 +452,7 @@ class GameEngine(
     fun shoot(): Boolean {
         if (phase != GamePhase.AIMING || power <= .01f) return false
         val player = players.first { it.id == focusedPlayerId }
+        soundEvents = soundEvents.copy(kicks = soundEvents.kicks + 1)
         lastShotPower = power
         openingKickoffPending = false
         lastKickingTeam = player.team
@@ -401,7 +468,9 @@ class GameEngine(
         val speed = 150f + appliedPower * 3_350f * fieldScale
         ball = ball.copy(
             velocity = direction * speed,
-            verticalVelocity = 120f + appliedPower * 280f,
+            // Soft touches roll; high power increasingly turns into loft.
+            // Full power close to goal can cross above the opening instead of scoring.
+            verticalVelocity = power * power * power * power * power * 3_200f,
             impactSideX = 0f,
             impactSideY = 0f,
             impactStrength = 0f,
@@ -415,17 +484,23 @@ class GameEngine(
 
     /** Advances simulation using seconds; callers should use a frame clock, not an animation timer. */
     fun step(deltaSeconds: Float): GameSnapshot {
+        advanceSimulation(deltaSeconds)
+        return snapshot
+    }
+
+    val currentPhase: GamePhase get() = phase
+
+    /** Same integration as step, without allocating a presentation snapshot. */
+    fun advanceSimulation(deltaSeconds: Float) {
         if (phase == GamePhase.DEFENDING || phase == GamePhase.AIMING) {
-            // Countdown follows elapsed frame time even when rendering drops below 30 fps.
             advanceStep(deltaSeconds.coerceIn(0f, .25f))
-            return snapshot
+            return
         }
         val frameTime = deltaSeconds.coerceIn(0f, 1f / 30f)
-        if (frameTime <= 0f) return snapshot
+        if (frameTime <= 0f) return
         val substepCount = ceil(frameTime / maxPhysicsStep).toInt().coerceAtLeast(1)
         val dt = frameTime / substepCount
         repeat(substepCount) { advanceStep(dt) }
-        return snapshot
     }
 
     private val maxPhysicsStep = 1f / 120f
@@ -560,6 +635,7 @@ class GameEngine(
         val minY = wallInset + ballRadius
         val maxY = height - wallInset - ballRadius
         if (position.x < minX || position.x > maxX) {
+            soundEvents = soundEvents.copy(impacts = soundEvents.impacts + 1)
             impactSideX = if (position.x > maxX) 1f else -1f
             impactSideY = 0f
             impactStrength = (abs(velocity.x) / 600f).coerceIn(.25f, 1f)
@@ -573,18 +649,26 @@ class GameEngine(
             val landedFromAir = ball.height > .01f && ball.verticalVelocity < 0f
             val bounceSpeed = landingSpeed * groundBounceRestitution
             verticalVelocity = if (bounceSpeed * metersPerDp > .18f) bounceSpeed else 0f
-            if (landedFromAir) landingStrength = (landingSpeed / 260f).coerceIn(.18f, 1f)
+            if (landedFromAir) {
+                soundEvents = soundEvents.copy(bounces = soundEvents.bounces + 1)
+                landingStrength = (landingSpeed / 260f).coerceIn(.18f, 1f)
+                // Landing dissipates planar energy too; gentle hops retain more momentum.
+                val landingRetention = 1f - (landingSpeed / 600f).coerceIn(0f, 1f) * .18f
+                velocity = velocity * landingRetention
+            }
         }
 
         // Height is separate from field position. Sweep the same coordinates
         // used to draw the ball, so both teams make contact at equal distances.
         val topGoalLine = wallInset + ballRadius
         val bottomGoalLine = height - wallInset - ballRadius
-        val goalCrossing = goalLineCrossing(previousPosition, position, heightAboveGround, topGoalLine, bottomGoalLine)
+        val goalCrossing = goalLineCrossing(previousPosition, position, ball.height, heightAboveGround, topGoalLine, bottomGoalLine)
         val goalHalfWidth = width * .16f - ballRadius
         val crossingOffsetX = goalCrossing?.let { it.x - width * .5f }
-        val isGoal = crossingOffsetX != null && abs(crossingOffsetX) <= goalHalfWidth
+        val isGoal = crossingOffsetX != null && abs(crossingOffsetX) <= goalHalfWidth &&
+            GoalGeometry.clearsOpening(goalCrossing.ballHeight, ballRadius)
         if (isGoal) {
+            soundEvents = soundEvents.copy(goals = soundEvents.goals + 1)
             val scoringTeam = goalCrossing.team
             lastScoringTeam = scoringTeam
             kickoffTeam = if (scoringTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
@@ -608,7 +692,21 @@ class GameEngine(
             return
         }
 
-        if (goalCrossing != null && crossingOffsetX != null &&
+        val hitCrossbar = goalCrossing != null && crossingOffsetX != null &&
+            abs(crossingOffsetX) <= goalHalfWidth && GoalGeometry.touchesCrossbar(goalCrossing.ballHeight, ballRadius)
+        if (hitCrossbar) {
+            val crossing = requireNotNull(goalCrossing)
+            soundEvents = soundEvents.copy(posts = soundEvents.posts + 1)
+            impactSideX = 0f
+            impactSideY = if (crossing.team == GameTeam.RED) -1f else 1f
+            impactStrength = (abs(velocity.y) / 600f).coerceIn(.35f, 1f)
+            goalPostImpactStrength = impactStrength
+            position = Vector2(crossing.x, crossing.lineY)
+            heightAboveGround = crossing.ballHeight
+            velocity = Vector2(velocity.x * wallTangentialRetention, -velocity.y * wallBounceRestitution)
+            verticalVelocity = -abs(verticalVelocity) * wallBounceRestitution
+        } else if (goalCrossing != null && crossingOffsetX != null &&
+            goalCrossing.ballHeight <= GoalGeometry.openingHeight &&
             abs(crossingOffsetX) <= width * .18f + ballRadius
         ) {
             // The cardboard posts sit on either side of the goal opening. A glancing
@@ -617,6 +715,7 @@ class GameEngine(
             impactSideX = -postNormalX
             impactSideY = if (goalCrossing.team == GameTeam.RED) -1f else 1f
             impactStrength = (abs(velocity.y) / 600f).coerceIn(.35f, 1f)
+            soundEvents = soundEvents.copy(posts = soundEvents.posts + 1)
             goalPostImpactStrength = impactStrength
             position = Vector2(goalCrossing.x, goalCrossing.lineY)
             velocity = Vector2(
@@ -627,6 +726,7 @@ class GameEngine(
         }
 
         if (position.y < minY || position.y > maxY) {
+            soundEvents = soundEvents.copy(impacts = soundEvents.impacts + 1)
             impactSideY = if (position.y > maxY) 1f else -1f
             impactSideX = 0f
             impactStrength = (abs(velocity.y) / 600f).coerceIn(.25f, 1f)
@@ -660,6 +760,7 @@ class GameEngine(
         }.minByOrNull { it.time }
 
         if (collision != null && velocity.length() > 12f) {
+            soundEvents = soundEvents.copy(impacts = soundEvents.impacts + 1)
             val player = collision.player
             val normal = collision.normal
             val previousSpeed = velocity.length()
@@ -775,14 +876,13 @@ class GameEngine(
         id: String,
         team: GameTeam,
         initialZone: Int,
-        jerseyNumber: Int,
         offsetTowardAttackRows: Float = 0f,
     ): MatchPlayer {
         val zonePosition = zoneCenter(initialZone)
         val position = zonePosition.copy(
             y = zonePosition.y + attackDirectionY(team) * height / ZONE_ROWS * offsetTowardAttackRows,
         )
-        return MatchPlayer(id, team, position, position, jerseyNumber = jerseyNumber)
+        return MatchPlayer(id, team, position, position)
     }
 
     /** Screen Y starts at the top: red advances toward smaller Y, blue toward larger Y. */
@@ -842,8 +942,8 @@ class GameEngine(
                     val firstShare = if (first.id == protectedId) 0f
                         else if (second.id == protectedId) 1f else .5f
                     val secondShare = 1f - firstShare
-                    val firstPosition = clampPlayerPosition(first, first.position - direction * (overlap * firstShare))
-                    val secondPosition = clampPlayerPosition(second, second.position + direction * (overlap * secondShare))
+                    val firstPosition = clampPlayerPosition(first.position - direction * (overlap * firstShare))
+                    val secondPosition = clampPlayerPosition(second.position + direction * (overlap * secondShare))
                     if (firstPosition != first.position || secondPosition != second.position) corrected = true
                     separated[firstIndex] = first.copy(position = firstPosition, velocity = Vector2(0f, 0f))
                     separated[secondIndex] = second.copy(position = secondPosition, velocity = Vector2(0f, 0f))
@@ -854,39 +954,28 @@ class GameEngine(
         players = separated
     }
 
-    private fun clampPlayerPosition(player: MatchPlayer, position: Vector2): Vector2 {
-        val inField = Vector2(
-            position.x.coerceIn(playerRadius, width - playerRadius),
-            position.y.coerceIn(playerRadius, height - playerRadius),
-        )
-        if (phase != GamePhase.BALL_MOVING) return inField
-        val center = if (player.id == focusedPlayerId) shotKickerAnchor ?: player.home else player.home
-        val fromCenter = inField - center
-        if (fromCenter.length() <= movementRadius) return inField
-        val limited = center + fromCenter * (movementRadius / fromCenter.length())
-        return Vector2(
-            limited.x.coerceIn(playerRadius, width - playerRadius),
-            limited.y.coerceIn(playerRadius, height - playerRadius),
-        )
-    }
+    private fun clampPlayerPosition(position: Vector2) = Vector2(
+        position.x.coerceIn(playerRadius, width - playerRadius),
+        position.y.coerceIn(playerRadius, height - playerRadius),
+    )
 
     private fun goalLineCrossing(
         start: Vector2,
         end: Vector2,
+        startHeight: Float,
         ballHeight: Float,
         topGoalLine: Float,
         bottomGoalLine: Float,
     ): GoalLineCrossing? {
-        if (ballHeight > 36f) return null
-
         val crossing = when {
             start.y >= topGoalLine && end.y < topGoalLine -> GameTeam.RED to topGoalLine
             start.y <= bottomGoalLine && end.y > bottomGoalLine -> GameTeam.BLUE to bottomGoalLine
             else -> return null
         }
         val progress = ((crossing.second - start.y) / (end.y - start.y)).coerceIn(0f, 1f)
+        val crossingHeight = startHeight + (ballHeight - startHeight) * progress
         val crossingX = start.x + (end.x - start.x) * progress
-        return GoalLineCrossing(crossing.first, crossing.second, crossingX)
+        return GoalLineCrossing(crossing.first, crossing.second, crossingX, crossingHeight)
     }
 
     private fun beginTimeoutTurnover() {
@@ -1031,39 +1120,16 @@ class GameEngine(
     }
 
     private fun clearKickerPosition(id: String, ballPosition: Vector2, forward: Float): Vector2 {
-        val current = players.first { it.id == id }.position
         val standOff = kickerStandOff()
-        val sideOffsets = listOf(0f, -20f, 20f, -40f, 40f, -60f, 60f, -80f, 80f, -100f, 100f)
-        val setbacks = listOf(standOff, 48f, 60f, 72f, 88f, 104f)
-        val nearby = setbacks.flatMap { setback ->
-            sideOffsets.map { side -> Vector2(ballPosition.x + side, ballPosition.y - forward * setback) }
-        }
-        fun isClear(point: Vector2): Boolean =
-            point.x in playerRadius..(width - playerRadius) &&
-                point.y in playerRadius..(height - playerRadius) &&
-                (point - ballPosition).length() >= standOff &&
-                players.none { it.id != id && (it.position - point).length() < playerSpacing }
-
-        // Prefer a short unobstructed approach, then a clear nearby destination.
-        nearby.firstOrNull { isClear(it) && hasClearPlayerPath(id, current, it) }?.let { return it }
-        nearby.firstOrNull(::isClear)?.let { return it }
-        val desired = Vector2(ballPosition.x, ballPosition.y - forward * standOff)
-        val gridStep = 16f
-        val grid = (0..((height - playerRadius * 2f) / gridStep).toInt()).asSequence().flatMap { row ->
-            (0..((width - playerRadius * 2f) / gridStep).toInt()).asSequence().map { column ->
-                Vector2(playerRadius + column * gridStep, playerRadius + row * gridStep)
-            }
-        }
-        return grid.filter(::isClear).minByOrNull { (it - desired).length() } ?: current
-    }
-
-    private fun hasClearPlayerPath(id: String, from: Vector2, to: Vector2): Boolean {
-        val movement = to - from
-        val steps = ceil(movement.length() / 5f).toInt().coerceAtLeast(1)
-        return (1..steps).all { step ->
-            val point = from + movement * (step.toFloat() / steps)
-            players.none { it.id != id && (it.position - point).length() < playerSpacing }
-        }
+        // Keep the kicker on a fixed-radius arc. The protected approach resolves
+        // overlapping bodies instead of moving the kicker far away from the ball.
+        val angles = listOf(0f, -15f, 15f, -30f, 30f, -45f, 45f, -60f, 60f, -75f, 75f, -90f, 90f)
+        return angles.asSequence().map { degrees ->
+            val angle = degrees * PI.toFloat() / 180f
+            Vector2(ballPosition.x + sin(angle) * standOff, ballPosition.y - forward * cos(angle) * standOff)
+        }.firstOrNull { point ->
+            point.x in playerRadius..(width - playerRadius) && point.y in playerRadius..(height - playerRadius)
+        } ?: players.first { it.id == id }.position
     }
 
     /** Make room behind a resting ball before the next shot, including at the back wall. */

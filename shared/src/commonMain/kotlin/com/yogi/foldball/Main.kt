@@ -1,5 +1,9 @@
 package com.yogi.foldball
 
+import com.yogi.foldball.core.audio.LocalGameAudio
+import com.yogi.foldball.core.audio.rememberGameAudio
+import com.yogi.foldball.domain.game.bot.BotStyle
+import com.yogi.foldball.domain.game.bot.BotDifficulty
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,13 +54,17 @@ fun SandboxMain() {
 private fun FoldballRoot(startAtHome: Boolean) {
     FoldballTheme {
         var route by remember { mutableStateOf(if (startAtHome) "home" else "sandbox") }
+        var playAgainstBot by remember { mutableStateOf(true) }
+        var botStyle by remember { mutableStateOf(BotStyle.BALANCED) }
+        var botDifficulty by remember { mutableStateOf(BotDifficulty.MEDIUM) }
         var sandboxTab by remember { mutableStateOf("movement") }
         val snackbarHostState = remember { SnackbarHostState() }
+        val audio = rememberGameAudio()
         Surface(Modifier.fillMaxSize(), color = FoldballColor.Wood) {
-            CompositionLocalProvider(LocalFoldballSnackbarHostState provides snackbarHostState) {
+            CompositionLocalProvider(LocalFoldballSnackbarHostState provides snackbarHostState, LocalGameAudio provides audio) {
                 Box(Modifier.fillMaxSize()) {
                     if (route == "match") {
-                        FullMatchScreen { destination ->
+                        FullMatchScreen(playAgainstBot = playAgainstBot, botDifficulty = botDifficulty, botStyle = botStyle) { destination ->
                             if (destination == "home") route = "home" else {
                                 sandboxTab = destination
                                 route = "sandbox"
@@ -71,7 +79,12 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                     onHomeClick = { route = "home" },
                                 )
                                 else -> HomeScreen(
-                                    onMatchClick = { route = "match" },
+                                    onMatchClick = { playAgainstBot = true; route = "match" },
+                                    onLocalMatchClick = { playAgainstBot = false; route = "match" },
+                                    style = botStyle,
+                                    onStyleChange = { botStyle = it },
+                                    difficulty = botDifficulty,
+                                    onDifficultyChange = { botDifficulty = it },
                                     onSandboxClick = {
                                         sandboxTab = "movement"
                                         route = "sandbox"

@@ -1,5 +1,7 @@
 package com.yogi.foldball.gamekit.presentation.field
 
+import com.yogi.foldball.domain.game.engine.GoalGeometry
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -116,7 +118,7 @@ fun ClassroomStadium(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 10.dp)
-                    .size(160.dp, 36.dp)
+                    .size((fieldWidthDp * .36f).dp, GoalGeometry.netDepth.dp)
                     .graphicsLayer {
                         val shake = if (shakeTopGoal) goalShakeOffset else 0f
                         translationX = shake * 4.dp.toPx()
@@ -127,7 +129,7 @@ fun ClassroomStadium(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 10.dp)
-                    .size(160.dp, 36.dp)
+                    .size((fieldWidthDp * .36f).dp, GoalGeometry.netDepth.dp)
                     .graphicsLayer {
                         val shake = if (shakeBottomGoal) goalShakeOffset else 0f
                         translationX = shake * 4.dp.toPx()
@@ -194,7 +196,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
     )
 
     // Top Penalty Area
-    val penaltyWidth = w * 0.48f
+    val penaltyWidth = w * 0.58f
     val penaltyHeight = h * 0.16f
     val topPenaltyLeft = (w - penaltyWidth) / 2
     drawRect(
@@ -203,17 +205,6 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         size = Size(penaltyWidth, penaltyHeight),
         style = Stroke(width = lineWidth),
     )
-    // Top Goal Area
-    val goalBoxWidth = w * 0.26f
-    val goalBoxHeight = h * 0.065f
-    val topGoalBoxLeft = (w - goalBoxWidth) / 2
-    drawRect(
-        color = FieldLineColor.copy(alpha = 0.82f),
-        topLeft = Offset(topGoalBoxLeft, marginPx),
-        size = Size(goalBoxWidth, goalBoxHeight),
-        style = Stroke(width = lineWidth),
-    )
-
     // Bottom Penalty Area
     drawRect(
         color = FieldLineColor.copy(alpha = 0.82f),
@@ -221,14 +212,6 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         size = Size(penaltyWidth, penaltyHeight),
         style = Stroke(width = lineWidth),
     )
-    // Bottom Goal Area
-    drawRect(
-        color = FieldLineColor.copy(alpha = 0.82f),
-        topLeft = Offset(topGoalBoxLeft, h - marginPx - goalBoxHeight),
-        size = Size(goalBoxWidth, goalBoxHeight),
-        style = Stroke(width = lineWidth),
-    )
-
     // Corner Arcs (4 Corners)
     val arcRadius = 14.dp.toPx()
     val arcSize = Size(arcRadius * 2, arcRadius * 2)
@@ -274,149 +257,44 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
     )
 }
 
-/** Top Goal rendering using Classroom Cardboard & Net Mesh aesthetic. */
+/** Shared cardboard goal: ground net and elevated crossbar use the physics height projection. */
 @Composable
-private fun ClassroomGoalTop(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-
-        // Net background
-        drawRoundRect(
-            color = NetBgColor,
-            topLeft = Offset(w * 0.12f, h * 0.15f),
-            size = Size(w * 0.76f, h * 0.70f),
-            cornerRadius = CornerRadius(4.dp.toPx()),
-        )
-
-        // Net Mesh Lines
-        val netRows = 4
-        val netCols = 10
-        for (i in 1 until netCols) {
-            val x = w * 0.12f + (w * 0.76f) * (i.toFloat() / netCols)
-            drawLine(
-                color = NetMeshColor,
-                start = Offset(x, h * 0.15f),
-                end = Offset(x, h * 0.85f),
-                strokeWidth = 1.2.dp.toPx(),
-            )
-        }
-        for (j in 1 until netRows) {
-            val y = h * 0.15f + (h * 0.70f) * (j.toFloat() / netRows)
-            drawLine(
-                color = NetMeshColor,
-                start = Offset(w * 0.12f, y),
-                end = Offset(w * 0.88f, y),
-                strokeWidth = 1.2.dp.toPx(),
-            )
-        }
-
-        // Cardboard Frame
-        drawRoundRect(
-            color = CardboardWallColor,
-            topLeft = Offset(w * 0.08f, h * 0.08f),
-            size = Size(w * 0.84f, h * 0.84f),
-            cornerRadius = CornerRadius(6.dp.toPx()),
-            style = Stroke(width = 3.dp.toPx()),
-        )
-
-        // Goal Posts (Left & Right)
-        drawRect(
-            color = Color(0xFFC18B52),
-            topLeft = Offset(w * 0.05f, 0f),
-            size = Size(w * 0.09f, h),
-        )
-        drawRect(
-            color = CardboardStrokeColor,
-            topLeft = Offset(w * 0.05f, 0f),
-            size = Size(w * 0.09f, h),
-            style = Stroke(width = 1.5.dp.toPx()),
-        )
-
-        drawRect(
-            color = Color(0xFFC18B52),
-            topLeft = Offset(w * 0.86f, 0f),
-            size = Size(w * 0.09f, h),
-        )
-        drawRect(
-            color = CardboardStrokeColor,
-            topLeft = Offset(w * 0.86f, 0f),
-            size = Size(w * 0.09f, h),
-            style = Stroke(width = 1.5.dp.toPx()),
-        )
-    }
-}
-
-/** Bottom Goal rendering using Classroom Cardboard & Net Mesh aesthetic. */
+private fun ClassroomGoalTop(modifier: Modifier = Modifier) = ClassroomGoal(modifier, true)
 @Composable
-private fun ClassroomGoalBottom(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
+private fun ClassroomGoalBottom(modifier: Modifier = Modifier) = ClassroomGoal(modifier, false)
 
-        // Net background
-        drawRoundRect(
-            color = NetBgColor,
-            topLeft = Offset(w * 0.12f, h * 0.15f),
-            size = Size(w * 0.76f, h * 0.70f),
-            cornerRadius = CornerRadius(4.dp.toPx()),
-        )
-
-        // Net Mesh Lines
-        val netRows = 4
-        val netCols = 10
-        for (i in 1 until netCols) {
-            val x = w * 0.12f + (w * 0.76f) * (i.toFloat() / netCols)
-            drawLine(
-                color = NetMeshColor,
-                start = Offset(x, h * 0.15f),
-                end = Offset(x, h * 0.85f),
-                strokeWidth = 1.2.dp.toPx(),
-            )
+@Composable
+private fun ClassroomGoal(modifier: Modifier, top: Boolean) {
+    Canvas(modifier) {
+        val left = size.width * .0556f
+        val right = size.width * .9444f
+        val ground = if (top) 18.dp.toPx() else size.height - 18.dp.toPx()
+        val back = ground + (if (top) -1f else 1f) * 12.dp.toPx()
+        val lift = GoalGeometry.visualLift(GoalGeometry.openingHeight).dp.toPx()
+        val bar = ground - lift
+        val rearBar = back - lift
+        val net = androidx.compose.ui.graphics.Path().apply {
+            moveTo(left, bar); lineTo(right, bar); lineTo(right, rearBar); lineTo(left, rearBar); close()
         }
-        for (j in 1 until netRows) {
-            val y = h * 0.15f + (h * 0.70f) * (j.toFloat() / netRows)
-            drawLine(
-                color = NetMeshColor,
-                start = Offset(w * 0.12f, y),
-                end = Offset(w * 0.88f, y),
-                strokeWidth = 1.2.dp.toPx(),
-            )
+        drawRoundRect(NetBgColor.copy(alpha=.7f), Offset(left, kotlin.math.min(rearBar,back)), Size(right-left, lift), CornerRadius(1.dp.toPx()))
+        drawPath(net, NetBgColor.copy(alpha=.45f))
+        for (i in 0..10) {
+            val x = left + (right-left)*i/10f
+            drawLine(NetMeshColor, Offset(x,bar), Offset(x,rearBar), 1.dp.toPx())
+            drawLine(NetMeshColor, Offset(x,rearBar), Offset(x,back), 1.dp.toPx())
         }
-
-        // Cardboard Frame
-        drawRoundRect(
-            color = CardboardWallColor,
-            topLeft = Offset(w * 0.08f, h * 0.08f),
-            size = Size(w * 0.84f, h * 0.84f),
-            cornerRadius = CornerRadius(6.dp.toPx()),
-            style = Stroke(width = 3.dp.toPx()),
-        )
-
-        // Goal Posts (Left & Right)
-        drawRect(
-            color = Color(0xFFC18B52),
-            topLeft = Offset(w * 0.05f, 0f),
-            size = Size(w * 0.09f, h),
-        )
-        drawRect(
-            color = CardboardStrokeColor,
-            topLeft = Offset(w * 0.05f, 0f),
-            size = Size(w * 0.09f, h),
-            style = Stroke(width = 1.5.dp.toPx()),
-        )
-
-        drawRect(
-            color = Color(0xFFC18B52),
-            topLeft = Offset(w * 0.86f, 0f),
-            size = Size(w * 0.09f, h),
-        )
-        drawRect(
-            color = CardboardStrokeColor,
-            topLeft = Offset(w * 0.86f, 0f),
-            size = Size(w * 0.09f, h),
-            style = Stroke(width = 1.5.dp.toPx()),
-        )
+        for (i in 1..4) {
+            val y = rearBar + (back-rearBar)*i/4f
+            drawLine(NetMeshColor, Offset(left,y), Offset(right,y), 1.dp.toPx())
+        }
+        drawLine(CardboardStrokeColor.copy(alpha=.35f), Offset(left+3.dp.toPx(),ground+3.dp.toPx()), Offset(right+3.dp.toPx(),ground+3.dp.toPx()), 4.dp.toPx())
+        for (x in listOf(left,right)) {
+            drawLine(CardboardStrokeColor, Offset(x,ground), Offset(x,bar), 8.dp.toPx())
+            drawLine(CardboardWallColor, Offset(x,ground), Offset(x,bar), 5.dp.toPx())
+            drawLine(CardboardStrokeColor, Offset(x,bar), Offset(x,rearBar), 3.dp.toPx())
+        }
+        drawLine(CardboardStrokeColor, Offset(left,bar), Offset(right,bar), 7.dp.toPx())
+        drawLine(CardboardWallColor, Offset(left,bar), Offset(right,bar), 4.dp.toPx())
     }
 }
 

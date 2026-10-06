@@ -45,9 +45,7 @@ import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.paper_crumple_sheet_v1
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.imageResource
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.sin
+import com.yogi.foldball.core.audio.LocalGameAudio
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -63,24 +61,33 @@ fun OpeningTossOverlay(
     val crumpleSheet = imageResource(Res.drawable.paper_crumple_sheet_v1)
     var winner by remember { mutableStateOf<GameTeam?>(null) }
     var horizontalLanding by remember { mutableFloatStateOf(0f) }
+    var trajectory by remember { mutableStateOf<TossTrajectory?>(null) }
 
-    LaunchedEffect(Unit) { crumple.animateTo(1f, tween(1200, easing = LinearEasing)) }
+    val audio = LocalGameAudio.current
+    val crumpleLoaded = audio?.isLoaded("crumple") ?: true
+    LaunchedEffect(crumpleLoaded) {
+        if (!crumpleLoaded) return@LaunchedEffect
+        audio?.play("crumple", .55f)
+        crumple.animateTo(1f, tween(1200, easing = LinearEasing))
+    }
     LaunchedEffect(winner) {
         val selected = winner ?: return@LaunchedEffect
-        bounce.animateTo(1f, tween(2100))
+        val toss = trajectory ?: return@LaunchedEffect
+        bounce.animateTo(toss.duration, tween((toss.duration * 1000f).roundToInt(), easing = LinearEasing))
         delay(950)
         onWinner(selected)
     }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color(0x55281C13))) {
-        val progress = bounce.value
-        val landingDirection = if (winner == GameTeam.BLUE) -1f else 1f
-        val centerX = maxWidth * (.5f + horizontalLanding * progress +
-            .11f * sin(progress * PI.toFloat() * 4f) * (1f - progress))
-        val groundY = maxHeight * (.5f + landingDirection * .24f * progress)
-        val hop = maxHeight * (.17f * abs(sin(progress * PI.toFloat() * 3.5f)) * (1f - progress))
-        val ballY = groundY - hop
+        val toss = trajectory
+        val pose = toss?.sample(bounce.value) ?: TossPose(0f, 0f, 0f, 0f, 0f)
+        val settled = toss != null && bounce.value >= toss.duration
+        val centerX = maxWidth / 2 + pose.x.dp
+        val groundY = maxHeight / 2 + pose.y.dp
         val ballSize = MatchBallVisualSize
+        val ballY = groundY - pose.height.dp
+        val elevation = (pose.height / 120f).coerceIn(0f, 1f)
+        val shadowWidth = ballSize * (1f + elevation * .8f)
 
         PaperCard(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 46.dp),
@@ -97,11 +104,11 @@ fun OpeningTossOverlay(
                 if (winner != null) {
                     Text(
                         when {
-                            progress < 1f -> "The paper ball is flipping..."
+                            !settled -> "The paper ball is in the air..."
                             else -> "TEAM ${winner?.let { teamConfiguration.forTeam(it).name }.orEmpty()} KICKS OFF!"
                         },
                         color = when {
-                            progress < 1f -> FoldballColor.Ink
+                            !settled -> FoldballColor.Ink
                             winner == GameTeam.BLUE -> FoldballColor.InkBlue
                             else -> FoldballColor.TeamRed
                         },
@@ -140,21 +147,22 @@ fun OpeningTossOverlay(
         if (crumple.value > .82f) {
             Canvas(
                 Modifier.align(Alignment.TopStart)
-                    .padding(start = centerX - 12.dp, top = groundY + 6.dp)
-                    .size(24.dp, 6.dp),
+                    .offset(x = centerX - shadowWidth / 2, y = groundY + ballSize / 2 - 2.dp)
+                    .size(shadowWidth, 5.dp + 3.dp * elevation)
+                    .alpha(1f - elevation * .65f),
             ) {
                 drawOval(
-                    Brush.radialGradient(listOf(Color(0x88402F20), Color.Transparent)),
+                    Brush.radialGradient(listOf(FoldballColor.Shadow.copy(alpha = .5f), Color.Transparent)),
                     size = size,
                 )
             }
             PaperBall(
                 modifier = Modifier.align(Alignment.TopStart)
-                    .padding(start = centerX - ballSize / 2, top = ballY - ballSize / 2)
+                    .offset(x = centerX - ballSize / 2, y = ballY - ballSize / 2)
                     .size(ballSize)
                     .alpha(((crumple.value - .82f) / .18f).coerceIn(0f, 1f)),
-                rotationX = progress * 17f,
-                rotationY = progress * 9f,
+                rotationX = pose.rotationX,
+                rotationY = pose.rotationY,
             )
         }
 
@@ -162,7 +170,12 @@ fun OpeningTossOverlay(
             PaperTossButton(
                 onClick = {
                     winner = if (Random.nextBoolean()) GameTeam.RED else GameTeam.BLUE
-                    horizontalLanding = Random.nextFloat() * .34f - .17f
+                    horizontalLanding = Random.nextFloat() * .24f - .12f
+                    trajectory = TossTrajectory(
+                        apexHeight = minOf(maxHeight.value * .19f, 150f),
+                        travelX = maxWidth.value * horizontalLanding,
+                        travelY = maxHeight.value * if (winner == GameTeam.BLUE) -.20f else .20f,
+                    )
                 },
                 modifier = Modifier.align(Alignment.Center).offset(y = 52.dp),
             )

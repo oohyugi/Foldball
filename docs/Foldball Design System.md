@@ -110,7 +110,7 @@ Use the shared components before writing screen-local `Box`, `clip`, shadow, or 
 | `MenuCard` | Large menu tile with a title and optional art. Locked cards are disabled, described as locked to assistive technology, and covered by a dark visual overlay. |
 | `PaperToggle` | Settings switch styled as a hand-drawn checkbox. Keep the full row interactive. |
 | `CirclePickerItem` | Team or ball picker item. Show selected state with the blue hand-drawn oval and expose selection semantics. |
-| `PaperDialog` | Confirmation and result dialog on a torn banner. Use secondary action for cancel and danger style for destructive confirmation. |
+| `PaperDialog` | Confirmation and result dialog on a torn banner. Optional content can provide shared selection controls between the title and message. Use secondary action for cancel and danger style for destructive confirmation. |
 | `InkToast` | Short-lived feedback on an ink-colored chip. `FoldballSnackbarHost` renders Material `SnackbarHost` messages with this component at the app root. UI can use `LocalFoldballSnackbarHostState.current.showSnackbar(...)` to send a message. |
 
 `PressableSurface` is the shared base for interactive paper surfaces. Keep press scale, clipping, shadow, enabled state, role, and semantics there so controls behave consistently.
@@ -119,14 +119,16 @@ Use the shared components before writing screen-local `Box`, `clip`, shadow, or 
 
 - **Home:** Use `FoldballScaffold`, the display type, and a clear primary `PaperButton`. Keep the primary action visually strongest.
 - **Menu grids:** Use `MenuCard` with the documented alternating tilt sequence. Do not invent a new card treatment for each tile.
-- **Match HUD:** Compose `MatchScoreboard`, `MatchStatusPanel`, and `PowerTimingMeter` from shared tokens and paper components. Show team identity with labels as well as color.
+- **Match HUD:** Compose `MatchScoreboard`, `MatchStatusPanel`, and `PowerTimingMeter` from shared tokens and paper components. Show team identity with labels as well as color. Keep the score pair centered, with each player/team name below its score. Show the red human player on the left and the blue opponent (AI in VS AI) on the right.
+- **VS AI:** Play controls the red team; the blue bot uses the same formation and kick rules. Disable formation actions and player gestures during bot turns, and label bot aiming explicitly. Sandbox remains manual. Tapping Play vs AI opens a PaperDialog to select Easy, Medium, or Hard using equal-width PaperChips with selection semantics and a short description. Play confirms entry; Cancel dismisses it. Default to Medium and retain the choice when returning home.
+- **Local 2 Players:** Home exposes a secondary Play 2 Players button below Play vs AI. Both teams use the existing formation and aiming controls on one device; keep match timers, scoring, pause, and restart behavior consistent. AI difficulty applies only to Play vs AI. The existing tape label explicitly shows the team name plus TURN and DEFEND or KICK, with a polite accessibility live region. Use English for match labels and instructions, including local two-player handoffs. Keep brief move/aim/hold/release instructions inside the existing bottom control height; do not resize the arena for handoff guidance.
 - **Match turn indicators:** Tint the countdown team label with that team's color. Keep bottom actions content-sized and distribute them across the bar; use the compact button variant when space is limited.
 - **Match team emphasis:** Fade the non-turn team smoothly to 68% during formation. Keep both teams fully visible during aiming, kicker approach, and ball movement. Keep the fade subtle enough to preserve jersey and position readability.
 - **Match haptics:** Play one subtle platform haptic when entering a formation or aiming phase, when a player move is accepted, when a kick is released, and when a goal is scored. Do not repeat haptics during timer or animation frames.
 - **Match formation and kick states:** During opening kickoff formation, label the defending team and show that movement stays in its own half. Highlight movable players with a pale dashed base marker; selecting one player shows neighboring zones with a reachable, collision-safe drag path in a subtle team-color fill and bright dashed outline, and blocked neighboring zones with a subtle gray fill and outline. Dragging into a highlighted zone may settle on its safe edge when the center is obstructed. Leave non-neighboring zones unmarked and draw no connector lines. During later formation turns, use the same marker and zone treatment. Reserve the yellow tape focus marker for the active kicker.
 - **Gameplay shadows:** Keep player cast shadows anchored to the standee's bottom edge so the player reads as touching the field. Place the ball contact shadow immediately below the ball; let it become wider and softer as the ball rises, while the contact mark fades.
 - **Match arena sizing:** Keep field width and height independent of phase-specific labels, status panels, and actions. Reserve consistent space for match controls so changing a bottom action never resizes the field or resets its coordinate system.
-- **Opening toss and goal celebration:** Use a torn `PaperCard` or `Banner` and the same team colors and type scale as the HUD.
+- **Opening toss and goal celebration:** Use a torn `PaperCard` or `Banner` and the same team colors and type scale as the HUD. Toss motion follows constant-gravity ballistic arcs with energy-losing ground rebounds, then a friction-limited roll. Use the match gravity scale and ground restitution; keep the shared match ball size. Ground travel stays straight, and the ground shadow broadens and fades with height.
 - **Arena:** Preserve the classroom desk, paper field, and cardboard materials. Use shared material tokens for newly drawn colors; do not change playable bounds to make a visual treatment fit.
 - **Dialogs and feedback:** Use `PaperDialog` for confirmation/results and the shared ink toast treatment for transient feedback.
 - **Settings and selection:** Use `PaperToggle` and `CirclePickerItem` when those flows are introduced.
@@ -160,3 +162,25 @@ For every task that creates or changes UI:
 The product uses a single light visual mode. The desk-and-paper materials define the game's identity, so do not add a dark theme without an explicit product decision.
 
 `FoldballType` loads `Permanent Marker` and `Patrick Hand` from `composeResources/font/`. `FoldballTheme` provides the Material baseline; Foldball-specific controls should use the tokens and components above instead of relying on Material defaults.
+
+### Match sound effects
+
+Use the shared PaperToggle with a minimum 48 dp target for Sound effects in the pause menu. The choice persists while navigating within the app session. Sound follows discrete engine events, never visual animation frames. Pause, mute, and leaving the match stop active sounds. Cardboard impact accompanies players and walls; separate kick, floor bounce, post, and net clips use balanced volumes and short cooldowns. Original reference recordings stay unchanged; runtime assets are trimmed mono PCM WAV.
+
+- For confirmation dialogs with long action labels, use `PaperDialog(stackedActions = true)` to keep both actions fully visible and preserve touch targets. Stack the secondary cancel action above the primary/danger confirmation action; each uses the available content width. Return Home uses this layout.
+
+- AI aiming uses the same aim indicator and PowerTimingMeter as human aiming. Aim moves continuously before charging; the power meter remains visible while the bot charges. Pause cancels bot charging without an automatic release.
+
+- Match scoreboard places the RED bottom-side player on the left and BLUE opponent on the right, in equal-width score columns separated by a colon. VS AI labels the RED human Player and chooses a fictional club opponent identity once per new match and reuses it across scoreboard, jerseys, toss, prompts, and results. Local matches label RED Player 1 and BLUE Player 2.
+
+- VS AI setup separates Difficulty from Gaya bermain. Style uses four shared PaperChips in two equal-width rows (Balanced, Parkir Bus, Kick & Rush, Total Football), with selected-state semantics and a short description. The selector scrolls when needed; retain selection while navigating home.
+
+- Bot body language may briefly aim toward another considered candidate, then correct with slight overshoot. Its power release follows reaction timing on the shared meter. Thinking and sequential defensive pauses stay within the live phase clock; pause/exit cancels execution.
+
+- Match airborne balls draw above their ground position by 25% of simulation height, capped at 72 dp for readability. Ground shadow and field coordinates remain anchored to the planar ball position; visual lift does not alter colliders or arena geometry.
+
+- `GoalGeometry` supplies physical opening height, height projection, and net depth to physics and rendering. Cardboard goals show elevated front posts/crossbar and a receding net; no numeric dimensions are displayed. Goal width remains aligned to existing field collision geometry.
+
+- Focus/formation pads follow facing: FRONT (BLUE) places its pad behind the standee toward screen top; BACK (RED) uses screen bottom. The BLUE focused kicker receives an 8.6% standee-size visual forward offset to match the RED visible contact gap; engine positions and ball colliders remain unchanged. Keep this offset through kick animation. Kicker approach keeps a fixed standoff radius and resolves nearby standee overlap rather than choosing a distant stance.
+
+- Pitch markings omit the small six-yard boxes because they have no Foldball gameplay rule. Keep one large defensive-area box at each end (58% of field width), centered and symmetric, along with outer lines, halfway line, kickoff circle, and corner arcs. Goal opening and collision geometry remain unchanged.

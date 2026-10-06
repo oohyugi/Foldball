@@ -10,7 +10,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -395,6 +397,8 @@ fun PaperDialog(
     onConfirm: () -> Unit,
     dismissText: String? = "Back",
     danger: Boolean = false,
+    stackedActions: Boolean = false,
+    content: (@Composable () -> Unit)? = null,
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         PaperCard(shape = FoldballShapes.Banner, tilt = FoldballTilt.Banner, ruled = false) {
@@ -404,10 +408,18 @@ fun PaperDialog(
                 verticalArrangement = Arrangement.spacedBy(FoldballSpace.md),
             ) {
                 Text(title.uppercase(), style = FoldballType.Title, color = FoldballColor.Ink, textAlign = TextAlign.Center)
+                content?.invoke()
                 Text(message, style = FoldballType.Body, color = FoldballColor.Ink, textAlign = TextAlign.Center)
-                Row(horizontalArrangement = Arrangement.spacedBy(FoldballSpace.sm)) {
-                    if (dismissText != null) PaperButton(dismissText, onDismiss, style = PaperButtonStyle.Secondary)
-                    PaperButton(confirmText, onConfirm, style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary)
+                if (stackedActions) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(FoldballSpace.sm)) {
+                        if (dismissText != null) PaperButton(dismissText, onDismiss, Modifier.fillMaxWidth(), style = PaperButtonStyle.Secondary)
+                        PaperButton(confirmText, onConfirm, Modifier.fillMaxWidth(), style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary)
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(FoldballSpace.sm)) {
+                        if (dismissText != null) PaperButton(dismissText, onDismiss, style = PaperButtonStyle.Secondary)
+                        PaperButton(confirmText, onConfirm, style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary)
+                    }
                 }
             }
         }

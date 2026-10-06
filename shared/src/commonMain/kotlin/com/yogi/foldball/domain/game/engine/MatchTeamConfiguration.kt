@@ -18,8 +18,8 @@ data class TeamIdentity(
 }
 
 data class MatchTeamConfiguration(
-    val red: TeamIdentity = TeamIdentity("INDO"),
-    val blue: TeamIdentity = TeamIdentity("THAI"),
+    val red: TeamIdentity = TeamIdentity("Player", "PLYR"),
+    val blue: TeamIdentity = TeamIdentity("Player 2", "P2"),
 ) {
     fun forTeam(team: GameTeam): TeamIdentity = when (team) {
         GameTeam.RED -> red
@@ -29,4 +29,14 @@ data class MatchTeamConfiguration(
     companion object {
         val Default = MatchTeamConfiguration()
     }
+}
+
+/** Pick an opponent once per match; gameplay still uses the BLUE side. */
+fun MatchTeamConfiguration.withRandomAiOpponent(random: kotlin.random.Random = kotlin.random.Random.Default): MatchTeamConfiguration {
+    val choices = listOf(
+        "Northchester City", "Royal Montara", "Catalora FC", "Bavern Athletic",
+        "Turinova FC", "Merseyvale FC", "Rosavelli FC", "Blueford FC",
+    )
+        .map { TeamIdentity(it) }.filter { !it.name.equals(red.name, ignoreCase = true) && it.jerseyLabel != red.jerseyLabel }
+    return copy(blue = choices.random(random))
 }

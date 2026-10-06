@@ -62,13 +62,13 @@ fun MatchScoreboard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(blueScore.toString(), style = FoldballType.Title, color = FoldballColor.InkBlue)
-                        Text(teamConfiguration.forTeam(GameTeam.BLUE).name, style = FoldballType.Caption.copy(fontSize = 9.sp), color = FoldballColor.InkBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(redScore.toString(), style = FoldballType.Title, color = FoldballColor.TeamRed)
+                        Text(teamConfiguration.forTeam(GameTeam.RED).name, style = FoldballType.Caption.copy(fontSize = 9.sp), color = FoldballColor.TeamRed, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text(":", style = FoldballType.Title, color = FoldballColor.Ink)
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(redScore.toString(), style = FoldballType.Title, color = FoldballColor.TeamRed)
-                        Text(teamConfiguration.forTeam(GameTeam.RED).name, style = FoldballType.Caption.copy(fontSize = 9.sp), color = FoldballColor.TeamRed, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(blueScore.toString(), style = FoldballType.Title, color = FoldballColor.InkBlue)
+                        Text(teamConfiguration.forTeam(GameTeam.BLUE).name, style = FoldballType.Caption.copy(fontSize = 9.sp), color = FoldballColor.InkBlue, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

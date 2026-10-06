@@ -1398,3 +1398,58 @@ Setelah core gameplay terbukti fun:
 Identitas game tetap:
 
 **sepak bola lipatan kertas dengan physics sederhana, positioning ringan, aiming yang mudah dipahami, dan visual handmade yang bisa dimainkan semua orang.**
+
+---
+
+## 54. Future Roadmap — Identitas Klub, Koleksi, dan Trading
+
+**Status: rencana setelah core gameplay stabil; bukan scope MVP dan belum diimplementasikan.**
+
+### 54.1 Klub pribadi
+
+Pemain dapat membuat nama klub sendiri, memilih singkatan jersey, warna tim, jersey, dan logo dari katalog Foldball.
+
+- Nama klub maksimal 20 karakter; singkatan jersey 2–4 karakter, disarankan otomatis dari nama dan dapat diedit.
+- Logo hanya dipilih dari desain yang disediakan Foldball. Pengguna tidak dapat menggambar, membuat, atau mengunggah logo.
+- Katalog menggunakan identitas klub dan artwork fiktif milik Foldball, tidak memakai nama/logo resmi klub sepak bola.
+- VS AI memakai klub pemain melawan klub fiktif; mode dua pemain dapat mengatur identitas kedua klub.
+- Identitas tampil konsisten pada scoreboard, jersey, opening toss, dan hasil pertandingan; simpan pilihan untuk sesi berikutnya.
+- Warna kedua tim harus tetap mudah dibedakan; detail alur pemilihan dan katalog ditentukan saat fitur ini dikerjakan.
+
+### 54.2 Koleksi item
+
+Item kosmetik dapat mencakup jersey, pola jersey, logo/emblem resmi katalog, aksesori kertas, skin bola, dan efek selebrasi. Nama klub adalah identitas pribadi, bukan item yang diperdagangkan.
+
+- Inventori mencatat item yang dimiliki dan item yang sedang digunakan.
+- Tentukan katalog, cara memperoleh, kelangkaan, dan kelayakan trade pada tahap desain fitur; belum ada keputusan monetisasi.
+- Kosmetik tidak memberi keuntungan kemampuan, mengubah hitbox, atau menyamarkan bola/indikator penting.
+- Logo dapat menjadi koleksi hanya jika berasal dari katalog yang disediakan Foldball.
+
+### 54.3 Item yang memengaruhi permainan — eksplorasi terpisah
+
+Item gameplay masih merupakan kemungkinan, bukan komitmen implementasi. Evaluasi hanya setelah kontrol dan keseimbangan match stabil.
+
+- Setiap keuntungan harus memiliki trade-off yang jelas dan dapat diperoleh lewat bermain.
+- Pemain dan AI memakai aturan efek yang sama; efek harus dijelaskan sebelum match.
+- Jangan memberi bonus gol otomatis, keuntungan berbayar yang dominan, atau pengecualian fisika.
+- Mode kompetitif perlu aturan khusus untuk menjaga keadilan; dapat membatasi item atau menyamakan kemampuan.
+- Contoh yang dapat diuji: kontrol aim lebih stabil dengan respons lebih lambat, atau karakter meter power berbeda. Contoh ini belum menjadi spesifikasi final.
+
+### 54.4 Trading antarpemain
+
+Trading menjadi tahap lanjutan setelah akun, inventori, dan sinkronisasi koleksi tersedia. Marketplace dan transaksi uang nyata tidak termasuk scope yang disepakati saat ini.
+
+- Hanya item yang ditandai tradeable yang dapat ditukar; pemain meninjau isi penawaran dan mengonfirmasi pertukaran.
+- Server menjadi sumber kebenaran kepemilikan dan memvalidasi kedua sisi pertukaran secara atomik.
+- Perlu pencegahan duplikasi/double-spend, pencatatan transaksi, pemulihan kegagalan, serta penanganan penyalahgunaan.
+- Karena target pengguna mencakup anak, akses dan batas trading perlu dirancang sesuai usia sebelum peluncuran publik.
+
+### 54.5 Urutan pengembangan
+
+1. Identitas klub pribadi dengan pilihan logo dan jersey katalog, tersimpan lokal.
+2. Inventori serta kosmetik yang dapat dibuka lewat bermain.
+3. Akun dan sinkronisasi kepemilikan di server.
+4. Trading kosmetik antarpemain.
+5. Evaluasi item gameplay sebagai pekerjaan balancing tersendiri jika diperlukan.
+
+Fitur ini ditunda. Prioritas saat ini tetap kontrol, fisika, keterbacaan visual, AI yang terasa manusiawi, dan match yang menyenangkan.
