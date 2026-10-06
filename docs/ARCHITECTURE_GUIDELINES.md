@@ -259,3 +259,7 @@ Untuk animasi player yang perlu mengubah bagian tubuh secara independen, gunakan
 - [Coil getting started](https://coil-kt.github.io/coil/getting_started/)
 - [Coil network image engines](https://coil-kt.github.io/coil/network/)
 - [Coil SVG decoder](https://coil-kt.github.io/coil/svgs/)
+
+## Implemented production state
+
+See [Architecture refactor](Architecture%20refactor.md) for the current App/Team/Match ViewModels, DataStore migration, navigation lifecycle and executable checks. Team customization is owned by `feature/team`; match consumes domain team identities.

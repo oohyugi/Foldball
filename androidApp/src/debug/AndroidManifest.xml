@@ -2,5 +2,6 @@
     <application>
         <activity android:name=".BotBenchmarkActivity" android:exported="true" />
         <activity android:name=".SoundCheckActivity" android:exported="true" />
+        <activity android:name=".DentPreviewActivity" android:exported="true" />
     </application>
 </manifest>

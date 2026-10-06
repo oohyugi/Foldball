@@ -2,8 +2,8 @@ package com.yogi.foldball
 
 import com.yogi.foldball.domain.game.bot.*
 import com.yogi.foldball.domain.game.engine.*
-import kotlinx.coroutines.*
 import kotlin.test.*
+import kotlinx.coroutines.*
 
 class BotTacticsTest {
     @Test fun simulationAdvanceIsIdenticalToPresentationStepThroughWholeRallies() {
@@ -31,7 +31,10 @@ class BotTacticsTest {
         engine.finishDefense()
         val original = engine.snapshot
         var stats: BotSearchStats? = null
-        val shot = BotPlanner(BotDifficulty.HARD, maxThinkingMillis = 1, onSearchCompleted = { stats = it }).chooseShot(engine)
+        val shot = BotPlanner(BotDifficulty.HARD, maxThinkingMillis = 1, onSearchCompleted = {
+            stats =
+                it
+        }).chooseShot(engine)
         assertEquals(original, engine.snapshot)
         assertTrue(shot.angle in -1.05f..1.05f && shot.power in .05f..1f)
         assertTrue(stats != null)
@@ -54,19 +57,46 @@ class BotTacticsTest {
     @Test fun hardPredictsLegalFormationChangesAndRepliesOnBlockedGoal() = runBlocking {
         val engine = GameEngine(393f, 1800f, targetScore = null)
         val field = GameEngine::class.java.getDeclaredField("players").apply { isAccessible = true }
-        field.set(engine, engine.snapshot.players.mapIndexed { index, player ->
-            val pos = if (player.team == GameTeam.BLUE) listOf(Vector2(80f, 815f), Vector2(196f, 815f), Vector2(312f, 815f), Vector2(196f, 600f))[index - 4]
-                else Vector2(70f + index * 84f, 1510f)
-            player.copy(position = pos, home = pos)
-        })
+        field.set(
+            engine,
+            engine.snapshot.players.mapIndexed { index, player ->
+                val pos = if (player.team ==
+                    GameTeam.BLUE
+                ) {
+                    listOf(
+                        Vector2(80f, 815f),
+                        Vector2(196f, 815f),
+                        Vector2(312f, 815f),
+                        Vector2(196f, 600f)
+                    )[
+                        index -
+                            4
+                    ]
+                } else {
+                    Vector2(70f + index * 84f, 1510f)
+                }
+                player.copy(position = pos, home = pos)
+            }
+        )
         engine.finishDefense()
         val original = engine.snapshot
         var stats: BotSearchStats? = null
-        BotPlanner(BotDifficulty.HARD, maxThinkingMillis = 6000, onSearchCompleted = { stats = it }).chooseShot(engine)
+        BotPlanner(BotDifficulty.HARD, maxThinkingMillis = 6000, onSearchCompleted = {
+            stats = it
+        }).chooseShot(engine)
 
         assertEquals(original, engine.snapshot)
-        assertTrue(requireNotNull(stats).formations > 0, "Hard must consider repositioning before the next shot")
-        assertTrue(requireNotNull(stats).replies > 0, "Hard must evaluate a reply after repositioning")
-        assertTrue(requireNotNull(stats).tacticalCandidates >= 2, "Hard must compare complete tactical outcomes")
+        assertTrue(
+            requireNotNull(stats).formations > 0,
+            "Hard must consider repositioning before the next shot"
+        )
+        assertTrue(
+            requireNotNull(stats).replies > 0,
+            "Hard must evaluate a reply after repositioning"
+        )
+        assertTrue(
+            requireNotNull(stats).tacticalCandidates >= 2,
+            "Hard must compare complete tactical outcomes"
+        )
     }
 }

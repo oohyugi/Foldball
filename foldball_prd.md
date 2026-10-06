@@ -1453,3 +1453,7 @@ Trading menjadi tahap lanjutan setelah akun, inventori, dan sinkronisasi koleksi
 5. Evaluasi item gameplay sebagai pekerjaan balancing tersendiri jika diperlukan.
 
 Fitur ini ditunda. Prioritas saat ini tetap kontrol, fisika, keterbacaan visual, AI yang terasa manusiawi, dan match yang menyenangkan.
+
+### 54.6 Current delivery — basic club identity
+
+Basic Welcome name/badge selection, local profile persistence, Home edit, randomized distinct opponent badges in both match modes, and scoreboard badges are now implemented. Jersey customization, inventory, trading, accounts, and gameplay items remain future scope. Local Player 2 receives a random fictional club with a badge different from the saved human club.

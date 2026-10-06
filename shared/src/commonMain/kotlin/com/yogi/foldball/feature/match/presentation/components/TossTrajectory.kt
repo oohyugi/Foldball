@@ -4,7 +4,7 @@ package com.yogi.foldball.feature.match.presentation.components
 internal class TossTrajectory(
     apexHeight: Float,
     private val travelX: Float,
-    private val travelY: Float,
+    private val travelY: Float
 ) {
     // Match engine scale: 0.0035 meters per dp, gravity 9.81 m/s².
     private val gravity = 9.81f / .0035f
@@ -42,7 +42,7 @@ internal class TossTrajectory(
         height = height,
         // Airborne spin is constant; contact roll follows distance / ball radius.
         rotationX = spinTime * 10f + (travelY * distance) / 8f,
-        rotationY = spinTime * 7f + (travelX * distance) / 8f,
+        rotationY = spinTime * 7f + (travelX * distance) / 8f
     )
 }
 
@@ -51,5 +51,5 @@ internal data class TossPose(
     val y: Float,
     val height: Float,
     val rotationX: Float,
-    val rotationY: Float,
+    val rotationY: Float
 )

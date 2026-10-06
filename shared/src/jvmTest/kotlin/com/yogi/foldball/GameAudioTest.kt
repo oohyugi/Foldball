@@ -2,17 +2,20 @@ package com.yogi.foldball
 
 import com.yogi.foldball.core.audio.GameAudio
 import com.yogi.foldball.core.audio.SoundPlayer
-import kotlinx.coroutines.*
 import kotlin.test.*
+import kotlinx.coroutines.*
 
 class GameAudioTest {
-    private class FakePlayer: SoundPlayer {
+    private class FakePlayer : SoundPlayer {
         val played = mutableListOf<String>()
         override suspend fun load(name: String, bytes: ByteArray) {}
-        override fun play(name: String, volume: Float) { played.add(name) }
+        override fun play(name: String, volume: Float) {
+            played.add(name)
+        }
         override fun stop() {}
         override fun close() {}
     }
+
     @Test fun cheerFollowsNetAndMuteDoesNotReplayPendingCheer() = runBlocking {
         val player = FakePlayer()
         val audio = GameAudio(player)
@@ -26,6 +29,7 @@ class GameAudioTest {
         pending.join()
         assertTrue(player.played.isEmpty())
     }
+
     @Test fun backgroundAndStopCancelPendingCheer() = runBlocking {
         val player = FakePlayer()
         val audio = GameAudio(player)
@@ -39,6 +43,7 @@ class GameAudioTest {
         stopped.join()
         assertTrue(player.played.isEmpty())
     }
+
     @Test fun finalWhistlePlaysImmediatelyAndStopCancelsDefeat() = runBlocking {
         val player = FakePlayer()
         val audio = GameAudio(player)
@@ -66,5 +71,4 @@ class GameAudioTest {
         audio.playMatchEnd(lostAgainstAi = false, wonAgainstAi = true)
         assertTrue(player.played.isEmpty())
     }
-
 }

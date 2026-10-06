@@ -26,18 +26,15 @@ private val powerSegments = listOf(
     Color(0xFFFFC928),
     Color(0xFFE9F22E),
     Color(0xFFA6E52B),
-    Color(0xFF39D83A),
+    Color(0xFF39D83A)
 )
 
 /** Vertical timing meter for the active shot; the parent owns its animated power value. */
 @Composable
-fun PowerTimingMeter(
-    power: Float,
-    modifier: Modifier = Modifier,
-) {
+fun PowerTimingMeter(power: Float, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.width(56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Canvas(Modifier.width(44.dp).height(164.dp)) {
             val outline = 2.dp.toPx()
@@ -46,14 +43,14 @@ fun PowerTimingMeter(
                 color = FoldballColor.Ink,
                 topLeft = Offset(outline, outline),
                 size = Size(size.width - outline * 2, size.height - outline * 2),
-                cornerRadius = CornerRadius(frameRadius),
+                cornerRadius = CornerRadius(frameRadius)
             )
             drawRoundRect(
                 color = FoldballColor.Paper,
                 topLeft = Offset(outline, outline),
                 size = Size(size.width - outline * 2, size.height - outline * 2),
                 cornerRadius = CornerRadius(frameRadius),
-                style = Stroke(width = 2.dp.toPx()),
+                style = Stroke(width = 2.dp.toPx())
             )
 
             val innerTop = 8.dp.toPx()
@@ -68,10 +65,10 @@ fun PowerTimingMeter(
                     color = color,
                     topLeft = Offset(
                         segmentLeft,
-                        innerTop + index * (segmentHeight + segmentGap),
+                        innerTop + index * (segmentHeight + segmentGap)
                     ),
                     size = Size(segmentWidth, segmentHeight),
-                    cornerRadius = CornerRadius(1.dp.toPx()),
+                    cornerRadius = CornerRadius(1.dp.toPx())
                 )
             }
 

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:property-naming")
+
 package com.yogi.foldball.core.ui.theme
 
 import androidx.compose.material3.MaterialTheme
@@ -80,7 +82,11 @@ object FoldballType {
     private fun hand() = FontFamily(Font(Res.font.patrick_hand, FontWeight.Normal))
 
     val Display: TextStyle
-        @Composable get() = TextStyle(fontFamily = marker(), fontSize = 58.sp, letterSpacing = (-1).sp)
+        @Composable get() = TextStyle(
+            fontFamily = marker(),
+            fontSize = 58.sp,
+            letterSpacing = (-1).sp
+        )
     val LargeTitle: TextStyle
         @Composable get() = TextStyle(fontFamily = marker(), fontSize = 40.sp)
     val Title: TextStyle
@@ -102,8 +108,8 @@ fun FoldballTheme(content: @Composable () -> Unit) {
             surface = FoldballColor.Paper,
             onSurface = FoldballColor.Ink,
             error = FoldballColor.TeamRed,
-            background = FoldballColor.Wood,
+            background = FoldballColor.Wood
         ),
-        content = content,
+        content = content
     )
 }

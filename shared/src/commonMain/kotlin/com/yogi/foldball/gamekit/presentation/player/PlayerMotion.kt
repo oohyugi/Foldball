@@ -7,10 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import kotlin.math.sqrt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.sqrt
 
 /** Cosmetic motion presets. These transforms must never alter gameplay position or collider. */
 enum class PlayerMotionPreset { IDLE, REPOSITION, APPROACH, AIM_LEFT, AIM_RIGHT, POWER, KICK, IMPACT }
@@ -77,12 +77,25 @@ class PlayerMotionState internal constructor() {
         launch { powerCharge.animateTo(0f, tween(210, easing = FastOutSlowInEasing)) }
         launch { powerPress.animateTo(0f, tween(180, easing = FastOutSlowInEasing)) }
         kickForward.animateTo(1.08f, tween(95, easing = FastOutSlowInEasing))
-        kickForward.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+        kickForward.animateTo(
+            0f,
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        )
     }
 
     suspend fun reset() {
-        x.snapTo(0f); y.snapTo(0f); tilt.snapTo(0f); scaleX.snapTo(1f); scaleY.snapTo(1f)
-        powerCharge.snapTo(0f); powerPress.snapTo(0f); kickForward.snapTo(0f); ballTravel.snapTo(0f)
+        x.snapTo(0f)
+        y.snapTo(0f)
+        tilt.snapTo(0f)
+        scaleX.snapTo(1f)
+        scaleY.snapTo(1f)
+        powerCharge.snapTo(0f)
+        powerPress.snapTo(0f)
+        kickForward.snapTo(0f)
+        ballTravel.snapTo(0f)
         launchedPower = 0f
         aimAngle.snapTo(0f)
     }
@@ -111,6 +124,7 @@ class PlayerMotionState internal constructor() {
                 scaleY.animateTo(1.035f, spring(stiffness = Spring.StiffnessMedium))
                 scaleY.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
             }
+
             PlayerMotionPreset.REPOSITION -> {
                 launch { tilt.animateTo(5f, tween(190, easing = FastOutSlowInEasing)) }
                 x.animateTo(42f, tween(330, easing = FastOutSlowInEasing))
@@ -119,40 +133,59 @@ class PlayerMotionState internal constructor() {
                 scaleY.animateTo(1.04f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
                 scaleY.animateTo(1f, tween(100))
             }
+
             PlayerMotionPreset.APPROACH -> {
-                x.snapTo(-62f); y.snapTo(22f); tilt.snapTo(-4f)
+                x.snapTo(-62f)
+                y.snapTo(22f)
+                tilt.snapTo(-4f)
                 launch { y.animateTo(0f, tween(390, easing = FastOutSlowInEasing)) }
                 x.animateTo(0f, tween(390, easing = FastOutSlowInEasing))
                 tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
                 scaleY.animateTo(1.035f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
                 scaleY.animateTo(1f, tween(100))
             }
+
             PlayerMotionPreset.AIM_LEFT, PlayerMotionPreset.AIM_RIGHT -> {
                 val side = if (preset == PlayerMotionPreset.AIM_LEFT) -1f else 1f
                 aimAngle.snapTo(.38f * side)
                 tilt.animateTo(4f * side, spring(dampingRatio = Spring.DampingRatioLowBouncy))
             }
+
             PlayerMotionPreset.POWER -> {
                 powerCharge.animateTo(.75f, tween(220, easing = FastOutSlowInEasing))
                 delay(250)
                 releaseChargedKick()
             }
+
             PlayerMotionPreset.KICK -> {
-                launch { y.animateTo(-8f, tween(150)) }; launch { tilt.animateTo(2f, tween(150)) }
+                launch { y.animateTo(-8f, tween(150)) }
+                launch { tilt.animateTo(2f, tween(150)) }
                 launch { scaleX.animateTo(.94f, tween(110)) }
                 scaleY.animateTo(.60f, tween(125, easing = FastOutSlowInEasing))
                 launch { y.animateTo(7f, spring(dampingRatio = Spring.DampingRatioLowBouncy)) }
-                launch { tilt.animateTo(-4f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                launch { scaleX.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                launch {
+                    tilt.animateTo(-4f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                }
+                launch {
+                    scaleX.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                }
                 scaleY.animateTo(1.14f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
                 launch { y.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)); scaleY.animateTo(1f, tween(140))
+                tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                scaleY.animateTo(1f, tween(140))
             }
+
             PlayerMotionPreset.IMPACT -> {
-                launch { scaleX.animateTo(1.08f, tween(80)) }; launch { scaleY.animateTo(.82f, tween(80)) }
-                tilt.animateTo(13f, tween(85, easing = FastOutSlowInEasing)); x.animateTo(15f, tween(90))
-                launch { scaleX.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
-                launch { scaleY.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
+                launch { scaleX.animateTo(1.08f, tween(80)) }
+                launch { scaleY.animateTo(.82f, tween(80)) }
+                tilt.animateTo(13f, tween(85, easing = FastOutSlowInEasing))
+                x.animateTo(15f, tween(90))
+                launch {
+                    scaleX.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                }
+                launch {
+                    scaleY.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+                }
                 launch { x.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy)) }
                 tilt.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
             }

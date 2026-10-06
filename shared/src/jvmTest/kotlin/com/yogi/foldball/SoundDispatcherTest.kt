@@ -18,11 +18,14 @@ class SoundDispatcherTest {
         dispatcher.dispatch(muted, 300, true) { name, _ -> sounds.add(name) }
         assertEquals(listOf("kick"), sounds)
     }
+
     @Test fun goalAndPostOverrideImpactAndImpactHasCooldown() {
         val snapshot = GameEngine(360f, 600f).snapshot
         val dispatcher = SoundDispatcher(snapshot.soundEvents)
         val sounds = mutableListOf<String>()
-        fun send(events: SoundEvents, time: Long) = dispatcher.dispatch(snapshot.copy(soundEvents = events), time, true) { name, _ -> sounds.add(name) }
+        fun send(events: SoundEvents, time: Long) = dispatcher.dispatch(snapshot.copy(soundEvents = events), time, true) { name, _ ->
+            sounds.add(name)
+        }
         send(SoundEvents(impacts = 1, posts = 1), 0)
         send(SoundEvents(impacts = 2, posts = 1, goals = 1), 100)
         send(SoundEvents(impacts = 3, posts = 1, goals = 1), 200)

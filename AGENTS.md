@@ -12,3 +12,7 @@ Before proposing, editing, or implementing any user interface, read [`docs/Foldb
 - Keep Home and Sandbox within safe drawing insets at the app root. The full-screen Match route may draw behind transparent system bars, but must inset interactive content at its route root.
 - If a UI change needs a new visual rule or reusable component, update `docs/Foldball Design System.md` in the same change.
 - Read the system's accessibility and layout guidance before changing interactive controls; keep their touch targets and semantics intact.
+
+## UI language
+
+- All user-facing UI copy must be in English, including commentary, controls, status messages, descriptions, and accessibility labels. User-created club names are preserved as entered.

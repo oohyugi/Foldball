@@ -13,6 +13,7 @@ import kotlin.test.assertTrue
 
 class GameEnginePhysicsTest {
     private val frameDurations = listOf(1f / 30f, 1f / 60f, 1f / 120f)
+
     // Keep players and goal walls outside the measured flight when isolating forces.
     private val isolatedFieldHeight = 5_000f
 
@@ -60,7 +61,7 @@ class GameEnginePhysicsTest {
         repeat(2) {
             val totalSpeedMps = sqrt(
                 expectedPlanarSpeedDp * expectedPlanarSpeedDp +
-                    expectedVerticalSpeedDp * expectedVerticalSpeedDp,
+                    expectedVerticalSpeedDp * expectedVerticalSpeedDp
             ) * metersPerDp
             val dragForceNewtons = .5f * airDensity * dragCoefficient * areaSquareMeters *
                 totalSpeedMps * totalSpeedMps
@@ -105,11 +106,16 @@ class GameEnginePhysicsTest {
                 val expectedGravityLoss = gravityDp * dt
                 if (prevVerticalVelocity > 0f && state.ball.verticalVelocity > 0f) {
                     // While rising, drag and gravity both act downward -> velocity loss >= gravity alone
-                    assertTrue(actualLoss >= expectedGravityLoss,
-                        "Rising ball vertical loss=$actualLoss expected at least $expectedGravityLoss at frame=$frame")
+                    assertTrue(
+                        actualLoss >= expectedGravityLoss,
+                        "Rising ball vertical loss=$actualLoss expected at least $expectedGravityLoss at frame=$frame"
+                    )
                 } else if (prevVerticalVelocity < 0f && state.ball.verticalVelocity < 0f) {
                     // While falling, air drag opposes gravity -> acceleration is less than gravity alone
-                    assertTrue(actualLoss <= expectedGravityLoss, "Falling ball vertical acceleration is slowed by air drag")
+                    assertTrue(
+                        actualLoss <= expectedGravityLoss,
+                        "Falling ball vertical acceleration is slowed by air drag"
+                    )
                 }
             }
             prevVerticalVelocity = state.ball.verticalVelocity
@@ -135,7 +141,11 @@ class GameEnginePhysicsTest {
 
         // Wait until the launched ball has landed and stopped bouncing.
         repeat(120) {
-            if (engine.snapshot.ball.height > 0f || engine.snapshot.ball.verticalVelocity > 0f) engine.step(dt)
+            if (engine.snapshot.ball.height > 0f ||
+                engine.snapshot.ball.verticalVelocity > 0f
+            ) {
+                engine.step(dt)
+            }
         }
 
         val ballOnGround = engine.snapshot.ball
@@ -150,13 +160,18 @@ class GameEnginePhysicsTest {
         val expectedFrictionLossPerFrame = expectedFrictionDecelDp * dt
         val ballRadiusMeters = 10f * metersPerDp
         val speedMetersPerSecond = initialSpeed * metersPerDp
-        val dragForceNewtons = .5f * 1.2f * .7f * PI.toFloat() * ballRadiusMeters * ballRadiusMeters *
-            speedMetersPerSecond * speedMetersPerSecond
+        val dragForceNewtons =
+            .5f * 1.2f * .7f * PI.toFloat() * ballRadiusMeters * ballRadiusMeters *
+                speedMetersPerSecond * speedMetersPerSecond
         val airDragLossUpperBound = dragForceNewtons / .002f * dt / metersPerDp
-        assertTrue(actualLoss >= expectedFrictionLossPerFrame,
-            "Friction loss=$actualLoss expected at least $expectedFrictionLossPerFrame, speed=$initialSpeed")
-        assertTrue(actualLoss <= expectedFrictionLossPerFrame + airDragLossUpperBound + .1f,
-            "Rolling friction and air drag loss bounded")
+        assertTrue(
+            actualLoss >= expectedFrictionLossPerFrame,
+            "Friction loss=$actualLoss expected at least $expectedFrictionLossPerFrame, speed=$initialSpeed"
+        )
+        assertTrue(
+            actualLoss <= expectedFrictionLossPerFrame + airDragLossUpperBound + .1f,
+            "Rolling friction and air drag loss bounded"
+        )
     }
 
     @Test
@@ -206,8 +221,14 @@ class GameEnginePhysicsTest {
             if (!bounced && after.impactSideX != 0f) {
                 bounced = true
                 // Wall bounce should reverse horizontal direction and dissipate velocity according to wall bounce restitution
-                assertTrue(before.velocity.x * after.velocity.x < 0f, "Horizontal velocity must reverse on wall bounce")
-                assertTrue(abs(after.velocity.x) <= abs(before.velocity.x) * wallBounceRestitution + .1f, "Horizontal speed must be scaled by restitution")
+                assertTrue(
+                    before.velocity.x * after.velocity.x < 0f,
+                    "Horizontal velocity must reverse on wall bounce"
+                )
+                assertTrue(
+                    abs(after.velocity.x) <= abs(before.velocity.x) * wallBounceRestitution + .1f,
+                    "Horizontal speed must be scaled by restitution"
+                )
             }
         }
         assertTrue(bounced, "Ball should bounce off the side boundary wall")
@@ -220,7 +241,12 @@ class GameEnginePhysicsTest {
             assertTrue(engine.finishDefense())
             engine.setPower(1f)
             assertTrue(engine.shoot())
-            assertPlayerContactReboundsOnce(engine, GameTeam.BLUE, expectedDirection = 1f, frame = frame)
+            assertPlayerContactReboundsOnce(
+                engine,
+                GameTeam.BLUE,
+                expectedDirection = 1f,
+                frame = frame
+            )
         }
     }
 
@@ -235,18 +261,30 @@ class GameEnginePhysicsTest {
             repeat(1800) {
                 if (!ready) {
                     val state = engine.step(frame)
-                    ready = state.phase == GamePhase.DEFENDING && state.focusedPlayerId.startsWith("blue")
+                    ready =
+                        state.phase == GamePhase.DEFENDING &&
+                        state.focusedPlayerId.startsWith("blue")
                 }
             }
             assertTrue(ready, "Expected a blue player to receive the next shot at frame=$frame")
             assertTrue(engine.finishDefense())
             engine.setPower(1f)
             assertTrue(engine.shoot())
-            assertPlayerContactReboundsOnce(engine, GameTeam.RED, expectedDirection = -1f, frame = frame)
+            assertPlayerContactReboundsOnce(
+                engine,
+                GameTeam.RED,
+                expectedDirection = -1f,
+                frame = frame
+            )
         }
     }
 
-    private fun assertPlayerContactReboundsOnce(engine: GameEngine, target: GameTeam, expectedDirection: Float, frame: Float) {
+    private fun assertPlayerContactReboundsOnce(
+        engine: GameEngine,
+        target: GameTeam,
+        expectedDirection: Float,
+        frame: Float
+    ) {
         var contacted = false
         var framesAfterContact = 0
         var priorImpact = 0f
@@ -257,17 +295,27 @@ class GameEnginePhysicsTest {
             val impact = state.players.filter { it.team == target }.maxOf { it.impactStrength }
             if (!contacted && impact > priorImpact + .05f) {
                 contacted = true
-                observations.append("contact frame=$index before=${before.velocity} after=${state.ball.velocity} height=${state.ball.height}\n")
+                observations.append(
+                    "contact frame=$index before=${before.velocity} after=${state.ball.velocity} height=${state.ball.height}\n"
+                )
                 assertTrue(state.ball.velocity.y * expectedDirection > 0f, observations.toString())
-                assertTrue(state.ball.velocity.length() <= before.velocity.length() * .8f, observations.toString())
-                assertTrue(state.ball.velocity.length() >= before.velocity.length() * .25f, observations.toString())
+                assertTrue(
+                    state.ball.velocity.length() <= before.velocity.length() * .8f,
+                    observations.toString()
+                )
+                assertTrue(
+                    state.ball.velocity.length() >= before.velocity.length() * .25f,
+                    observations.toString()
+                )
                 // Impact can be observed a substep later through its decaying
                 // visual intensity; allow the small upward hop to have started.
                 assertTrue(state.ball.height <= 20f, observations.toString())
                 assertTrue(state.ball.verticalVelocity > 80f, observations.toString())
             } else if (contacted && framesAfterContact < 1) {
                 framesAfterContact++
-                observations.append("after=$framesAfterContact y=${state.ball.position.y} vy=${state.ball.velocity.y} height=${state.ball.height} impact=$impact\n")
+                observations.append(
+                    "after=$framesAfterContact y=${state.ball.position.y} vy=${state.ball.velocity.y} height=${state.ball.height} impact=$impact\n"
+                )
                 assertTrue(state.ball.velocity.y * expectedDirection >= 0f, observations.toString())
                 assertTrue(impact <= priorImpact + .05f, observations.toString())
             }

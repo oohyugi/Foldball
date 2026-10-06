@@ -184,3 +184,79 @@ Use the shared PaperToggle with a minimum 48 dp target for Sound effects in the 
 - Focus/formation pads follow facing: FRONT (BLUE) places its pad behind the standee toward screen top; BACK (RED) uses screen bottom. The BLUE focused kicker receives an 8.6% standee-size visual forward offset to match the RED visible contact gap; engine positions and ball colliders remain unchanged. Keep this offset through kick animation. Kicker approach keeps a fixed standoff radius and resolves nearby standee overlap rather than choosing a distant stance.
 
 - Pitch markings omit the small six-yard boxes because they have no Foldball gameplay rule. Keep one large defensive-area box at each end (58% of field width), centered and symmetric, along with outer lines, halfway line, kickoff circle, and corner arcs. Goal opening and collision geometry remain unchanged.
+
+- Sandbox temporary dent prototype uses a shared PaperToggle, labeled as resetting the Sandbox. Dented standees show a persistent compressed/leaning body and paper crease; the focused dented kicker shows effective strength, bounded direction error, and recovery after a goal. Match routes remain normal.
+
+- Dented standees have a clearly buckled upper silhouette, a 27% height compression, 10% widening, and a 10-degree lean anchored at the base. A broad zigzag fold with ink shadow and paper highlight remains visible at gameplay size. This is visual only; collision and condition penalties are unchanged.
+
+- Player Lab has one full-width PaperButton cycling dent preview 0/25/50/75/100% then normal. Its percentage controls the shared standee visual deformation continuously; it does not alter match damage rules or shot penalties.
+
+- Movement Sandbox denting maps accumulated normal-contact speed to a continuous 0–100% visual deformation. Every standee displays its dent percentage below its body while the prototype is enabled; the aiming status shows current dent and effective strength. Condition labels use shared caption typography and do not intercept player gestures.
+
+- FRONT focus pads extend upward from the standee foot anchor (62–85% of its bounding height), overlapping the 79.7% base pivot. Do not mirror the pad around the canvas center: that detaches it near the head. BACK keeps its existing 72–93% pad.
+
+- Player Lab exposes Front/Back as equal-width shared PaperChips with selection semantics. Facing changes preserve current dent percentage and motion controls so both silhouettes and focus anchors can be compared.
+
+- Standee top folds use Paper on Front and a 45% Paper-to-PaperEdge blend on Back for a shaded paper interior. Preserve the ink outline; avoid translucent black fill for Back folds.
+
+- Airborne ball projection remains linear up to crossbar height, then smoothly approaches 72 dp using an exponential curve rather than clipping at a fixed height. Ground shadow stays anchored to the planar position, widens and fades with projected lift. Ball scale grows gently with lift; landing strength drives brief horizontal squash and vertical compression near the ground. Physics, goal clearance, and hitboxes remain unchanged.
+
+- Dented kicker status communicates percentage, strength, faster meter, and recovery after goal. The shared meter cycle is 1.8 s normal to 1.3 s fully dented; no additional hidden directional error is caused by dent.
+
+## UI language and match commentary
+
+All user-facing UI text and accessibility labels must be in English (preserve user-created names). Match commentary reuses the upper field TapeLabel for 1.4 seconds with at least 2.5 seconds between messages. Use discrete verified events: OVER THE BAR!, OFF THE CROSSBAR!, OFF THE POST!, BLOCKED! Do not infer an overbar miss merely from flight height. Goal/results take priority; paused events are consumed without replay. Commentary does not intercept gameplay controls.
+
+- Standee bodies remain fully opaque in inactive, opponent-turn, and charging states. De-emphasize jerseys via PaperEdge color blending (28% default inactive in Player Lab; 38% non-active team during formation), with a 360 ms color-blend transition in Match. Keep paper panels, names, outlines, and colliders solid; focus pads, body compression, and meter communicate active/charging state.
+
+- Standee jerseys retain their original opaque colors in all focus/turn states; remove inactive/opponent color muting. Active kickers use a stronger Tape-yellow pulsing base and a gently bobbing ink-outlined paper arrow above the head. Formation-eligible players keep static dashed pads; inactive players have no focus pad. Arrow/pulse disappear when the kicker begins kicking; overlays do not intercept touches.
+
+- Kicker pointer is a larger yellow bobbing arrow rendered above standee body layers, including Back folds. Movable formation players use smaller static Paper triangles in the same head-adjacent area, plus their dashed base. Inactive and kicking states show no pointer.
+
+- Pointer follows team facing: FRONT uses the top of standee bounds, BACK uses the bottom with an upward-pointing mirrored marker. This keeps kicker and movable-player indicators behind their attack direction, away from the ball.
+
+- Current selection indicators: kicker has a pulsing yellow base only, without a pointer. Formation-eligible movable players have a static Paper triangle above the standee for both Front and Back, plus the dashed base. Inactive/kicking players have no pointer. This replaces earlier facing-dependent/kicker arrow rules.
+
+- During formation, reachable vacant zones for the active defending team receive a light team-colored tint and dashed boundaries before selecting a player. AI formation uses a quieter tint with no interactive overlay. Selecting a player replaces the team overview with that player's legal destinations. The existing legality checks determine all highlights; overlay disappears on leaving formation.
+
+- Dent deformation accumulates an energy-weighted contact direction. Side hits bend left/right, frontal hits compress the center, and oblique hits combine lean and depth. Geometry stays stable between contacts; name/number printing follows the upper-sheet warp. External dent-status text stays upright. Collider geometry is unchanged.
+
+- Dent center creases use a single directional fold with softly graded upper light and lower shadow, plus a fine crease edge. Avoid heavy zigzag outlines or opaque bands that look painted onto the jersey.
+
+- Standee outer edges use a thin ink contour over a PaperEdge rim, with a small lower/right paper-thickness offset and sparse fixed cut-edge marks. All use the same warped silhouette when dented. Avoid uniformly jagged borders and heavy black sticker outlines.
+
+- Home exposes an optional Standee damage PaperToggle, off by default, applying to both VS AI and local matches and retained for the app session. Explain timing difficulty and after-goal recovery before Play. In full matches, only damaged standees show percentage labels; Sandbox may show 0% for debugging.
+
+- Full Match does not display persistent dent-percentage labels under standees. Damage remains visible through deformation; the focused kicker status explains its condition during aiming. Per-player percentage labels remain Sandbox diagnostics only.
+
+- Current match damage policy: Standee damage is enabled by default for VS AI and local two-player matches. Home has no damage checkbox or explanatory toggle copy. Settings UI is deferred; Sandbox retains its independent diagnostic toggle. This supersedes earlier opt-in Home rules.
+
+- Standee damage status is an unlabelled 34×5 dp horizontal bar beneath the body: remaining fill decreases with damage and transitions Grass→Tape→TeamRed. Paper backing and thin Ink border retain contrast on grass. Show for damaged, focused, or selected players; Sandbox may show all bars. No visible label or percentage; provide progress semantics for accessibility.
+
+- Condition bars sit behind the standee relative to team attack direction: BLUE above its body bounds, RED below. Keep a 5 dp gap from the silhouette and preserve the planar position/hitbox.
+
+- With standee damage enabled, show condition bars on every standee throughout the match, including full green bars for undamaged players. Bars remain behind each team's body and have no visible text. This supersedes conditional visibility rules.
+
+- Condition bars anchor to visible paper edges, not the square component bounds: BLUE above the upper fold (11.9% of body height), RED below the foot pivot (79.7%). Use a 2 dp visible gap; include the BLUE kicker visual offset.
+
+- Current damage lifetime: damage and accumulated bend direction persist through possession changes and kickoff after goals until the match ends. Only a new match/rematch or explicit Sandbox reset restores normal standees. Any recovery copy must say match-end/new-match recovery, not after-goal reset. This supersedes previous kickoff reset rules.
+
+- Do not display dent/strength/meter status text over the field beneath commentary. Standee deformation and unlabelled condition bars communicate damage; commentary and power meter keep their existing space.
+
+- Full matches end at three goals or three minutes. Scoreboard shows total countdown separate from phase seconds. Pause and opening toss do not consume match time; a final in-flight shot completes before result. Ties show DRAW without overtime.
+
+- Scoreboard countdown occupies the center separator between equal-width RED and BLUE score/name columns, replacing the colon. Keep the phase timer separate in its existing side card.
+
+- Match result separates team names above large scores in two equal columns; do not concatenate names ending in digits with scores. Result actions stack full-width for long labels. Goal celebration uses a spring entrance, a short decaying paper-banner wobble, an expanding fading ink burst, and team-colored paper confetti; motion resets for each goal and does not alter play.
+
+## Welcome and club identity
+
+First launch opens Welcome within safe drawing insets. Require a trimmed nonempty team name up to 20 characters and a badge from the 16 bundled WebP assets. Badge choices use equal-width PaperCards with minimum 64 dp targets, radio selection semantics, and Tape selected fill; PaperCard accepts a shared-token color override. Team-name entry uses Material OutlinedTextField with Foldball body typography inside PaperCard. Continue saves the profile locally; Home exposes Edit. AI and local opponents draw from badges excluding the human selection; select once per match. Badge appears with name and score in Match. Original PNG references are preserved; runtime badges are 256×256 WebP.
+
+- Scoreboard badge layout is compact: each equal-width team column has a 36 dp badge beside its 30 sp score, with an 11 sp single-line name below. Mirror badge placement at the outer edges of the two score groups; reserve 48 dp for the centered 17 sp countdown. Do not stack badge, score, and name as three separate rows.
+
+- Scoreboard uses RED badge + short name on the left, centered score above total countdown, and BLUE short name + badge on the right. Short names are 1–4 alphanumeric characters and editable on Welcome; blank input auto-generates one. Persist with the profile; legacy profiles derive a fallback. Full names remain in Home/results.
+
+- Scoreboard paper card wraps compact badge/short-name groups and a centered score/time column instead of stretching to full width. Center the complete card on the screen; pause remains at the leading edge with reserved clearance. Avoid weighted team groups that push badges to opposite card edges.
+
+- Team setup uses shared `FoldballSpace` values. Show Loading while the profile is read, disable edits and save while saving, and keep drafts when saving fails. Existing teams expose Save team and Cancel; first launch exposes Continue. Retry reloads only a failed initial read. UI text and accessibility descriptions remain English.

@@ -1,7 +1,5 @@
 package com.yogi.foldball.gamekit.presentation.field
 
-import com.yogi.foldball.domain.game.engine.GoalGeometry
-
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -32,16 +29,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballShadow
+import com.yogi.foldball.domain.game.engine.GoalGeometry
 import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.field_green_paper
 import foldball.shared.generated.resources.home_desk_classroom
 import foldball.shared.generated.resources.wall_cardboard_tile
 import org.jetbrains.compose.resources.painterResource
-import com.yogi.foldball.core.ui.theme.FoldballColor
-import com.yogi.foldball.core.ui.theme.FoldballShadow
 
 /** Classroom Theme colors from classroom_theme.json */
 private val FieldLineColor = FoldballColor.Paper
@@ -58,21 +57,21 @@ fun ClassroomStadium(
     goalShakeOffset: Float = 0f,
     shakeTopGoal: Boolean = false,
     shakeBottomGoal: Boolean = false,
-    content: @Composable BoxScope.() -> Unit,
+    content: @Composable BoxScope.() -> Unit
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(fieldHeightDp.dp)
             .shadow(FoldballShadow.offsetY, RoundedCornerShape(26.dp))
-            .clip(RoundedCornerShape(26.dp)),
+            .clip(RoundedCornerShape(26.dp))
     ) {
         // Layer 1: Desk Wood Background
         Image(
             painter = painterResource(Res.drawable.home_desk_classroom),
             contentDescription = "Classroom desk",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
         )
 
         // Layer 2: Classroom Desk Decor (Notebook, ruler, pencil, paperclips outside pitch)
@@ -80,7 +79,7 @@ fun ClassroomStadium(
 
         // Layer 3: Playable Field Container (Paper surface + Cardboard walls + Canvas markings)
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
         ) {
             // Layer 3a: Cardboard remains visible as a narrow border around the playable paper.
             Image(
@@ -90,7 +89,7 @@ fun ClassroomStadium(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(12.dp),
-                alpha = 0.85f,
+                alpha = 0.85f
             )
 
             // Layer 3b: Green surface meets the existing 18dp playable boundary.
@@ -101,7 +100,7 @@ fun ClassroomStadium(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(18.dp)
-                    .clip(RoundedCornerShape(20.dp)),
+                    .clip(RoundedCornerShape(20.dp))
             )
 
             // Layer 4: Field Markings Runtime (Canvas)
@@ -109,7 +108,7 @@ fun ClassroomStadium(
                 drawClassroomFieldMarkings(
                     w = size.width,
                     h = size.height,
-                    marginPx = 18.dp.toPx(),
+                    marginPx = 18.dp.toPx()
                 )
             }
 
@@ -123,7 +122,7 @@ fun ClassroomStadium(
                         val shake = if (shakeTopGoal) goalShakeOffset else 0f
                         translationX = shake * 4.dp.toPx()
                         rotationZ = shake * 1.1f
-                    },
+                    }
             )
             ClassroomGoalBottom(
                 modifier = Modifier
@@ -134,7 +133,7 @@ fun ClassroomStadium(
                         val shake = if (shakeBottomGoal) goalShakeOffset else 0f
                         translationX = shake * 4.dp.toPx()
                         rotationZ = shake * 1.1f
-                    },
+                    }
             )
 
             // Layer 6: Match Entities & Interactive Content (Players, Ball, VFX)
@@ -154,7 +153,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         topLeft = Offset(marginPx, marginPx),
         size = Size(w - marginPx * 2, h - marginPx * 2),
         cornerRadius = boundaryCornerRadius,
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
 
     // Inner subtle drop shadow for cardboard walls
@@ -163,7 +162,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         topLeft = Offset(marginPx, marginPx),
         size = Size(w - marginPx * 2, h - marginPx * 2),
         cornerRadius = boundaryCornerRadius,
-        style = Stroke(width = 3.dp.toPx()),
+        style = Stroke(width = 3.dp.toPx())
     )
 
     // Half-way Line
@@ -172,7 +171,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         start = Offset(marginPx, h / 2),
         end = Offset(w - marginPx, h / 2),
         strokeWidth = lineWidth,
-        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx())),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
     )
 
     // Center Circle & Spot
@@ -181,18 +180,18 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
     drawCircle(
         color = Color(0xFFF9F6F0).copy(alpha = 0.15f),
         radius = centerCircleRadius,
-        center = centerSpot,
+        center = centerSpot
     )
     drawCircle(
         color = FieldLineColor.copy(alpha = 0.85f),
         radius = centerCircleRadius,
         center = centerSpot,
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
     drawCircle(
         color = FieldLineColor,
         radius = 3.dp.toPx(),
-        center = centerSpot,
+        center = centerSpot
     )
 
     // Top Penalty Area
@@ -203,14 +202,14 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         color = FieldLineColor.copy(alpha = 0.82f),
         topLeft = Offset(topPenaltyLeft, marginPx),
         size = Size(penaltyWidth, penaltyHeight),
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
     // Bottom Penalty Area
     drawRect(
         color = FieldLineColor.copy(alpha = 0.82f),
         topLeft = Offset(topPenaltyLeft, h - marginPx - penaltyHeight),
         size = Size(penaltyWidth, penaltyHeight),
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
     // Corner Arcs (4 Corners)
     val arcRadius = 14.dp.toPx()
@@ -223,7 +222,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         useCenter = false,
         topLeft = Offset(marginPx, marginPx),
         size = arcSize,
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
     // Top Right
     drawArc(
@@ -233,7 +232,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         useCenter = false,
         topLeft = Offset(w - marginPx - arcRadius * 2, marginPx),
         size = arcSize,
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
     // Bottom Left
     drawArc(
@@ -243,7 +242,7 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         useCenter = false,
         topLeft = Offset(marginPx, h - marginPx - arcRadius * 2),
         size = arcSize,
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
     // Bottom Right
     drawArc(
@@ -253,13 +252,14 @@ private fun DrawScope.drawClassroomFieldMarkings(w: Float, h: Float, marginPx: F
         useCenter = false,
         topLeft = Offset(w - marginPx - arcRadius * 2, h - marginPx - arcRadius * 2),
         size = arcSize,
-        style = Stroke(width = lineWidth),
+        style = Stroke(width = lineWidth)
     )
 }
 
 /** Shared cardboard goal: ground net and elevated crossbar use the physics height projection. */
 @Composable
 private fun ClassroomGoalTop(modifier: Modifier = Modifier) = ClassroomGoal(modifier, true)
+
 @Composable
 private fun ClassroomGoalBottom(modifier: Modifier = Modifier) = ClassroomGoal(modifier, false)
 
@@ -274,27 +274,41 @@ private fun ClassroomGoal(modifier: Modifier, top: Boolean) {
         val bar = ground - lift
         val rearBar = back - lift
         val net = androidx.compose.ui.graphics.Path().apply {
-            moveTo(left, bar); lineTo(right, bar); lineTo(right, rearBar); lineTo(left, rearBar); close()
+            moveTo(left, bar)
+            lineTo(right, bar)
+            lineTo(right, rearBar)
+            lineTo(left, rearBar)
+            close()
         }
-        drawRoundRect(NetBgColor.copy(alpha=.7f), Offset(left, kotlin.math.min(rearBar,back)), Size(right-left, lift), CornerRadius(1.dp.toPx()))
-        drawPath(net, NetBgColor.copy(alpha=.45f))
+        drawRoundRect(
+            NetBgColor.copy(alpha = .7f),
+            Offset(left, kotlin.math.min(rearBar, back)),
+            Size(right - left, lift),
+            CornerRadius(1.dp.toPx())
+        )
+        drawPath(net, NetBgColor.copy(alpha = .45f))
         for (i in 0..10) {
-            val x = left + (right-left)*i/10f
-            drawLine(NetMeshColor, Offset(x,bar), Offset(x,rearBar), 1.dp.toPx())
-            drawLine(NetMeshColor, Offset(x,rearBar), Offset(x,back), 1.dp.toPx())
+            val x = left + (right - left) * i / 10f
+            drawLine(NetMeshColor, Offset(x, bar), Offset(x, rearBar), 1.dp.toPx())
+            drawLine(NetMeshColor, Offset(x, rearBar), Offset(x, back), 1.dp.toPx())
         }
         for (i in 1..4) {
-            val y = rearBar + (back-rearBar)*i/4f
-            drawLine(NetMeshColor, Offset(left,y), Offset(right,y), 1.dp.toPx())
+            val y = rearBar + (back - rearBar) * i / 4f
+            drawLine(NetMeshColor, Offset(left, y), Offset(right, y), 1.dp.toPx())
         }
-        drawLine(CardboardStrokeColor.copy(alpha=.35f), Offset(left+3.dp.toPx(),ground+3.dp.toPx()), Offset(right+3.dp.toPx(),ground+3.dp.toPx()), 4.dp.toPx())
-        for (x in listOf(left,right)) {
-            drawLine(CardboardStrokeColor, Offset(x,ground), Offset(x,bar), 8.dp.toPx())
-            drawLine(CardboardWallColor, Offset(x,ground), Offset(x,bar), 5.dp.toPx())
-            drawLine(CardboardStrokeColor, Offset(x,bar), Offset(x,rearBar), 3.dp.toPx())
+        drawLine(
+            CardboardStrokeColor.copy(alpha = .35f),
+            Offset(left + 3.dp.toPx(), ground + 3.dp.toPx()),
+            Offset(right + 3.dp.toPx(), ground + 3.dp.toPx()),
+            4.dp.toPx()
+        )
+        for (x in listOf(left, right)) {
+            drawLine(CardboardStrokeColor, Offset(x, ground), Offset(x, bar), 8.dp.toPx())
+            drawLine(CardboardWallColor, Offset(x, ground), Offset(x, bar), 5.dp.toPx())
+            drawLine(CardboardStrokeColor, Offset(x, bar), Offset(x, rearBar), 3.dp.toPx())
         }
-        drawLine(CardboardStrokeColor, Offset(left,bar), Offset(right,bar), 7.dp.toPx())
-        drawLine(CardboardWallColor, Offset(left,bar), Offset(right,bar), 4.dp.toPx())
+        drawLine(CardboardStrokeColor, Offset(left, bar), Offset(right, bar), 7.dp.toPx())
+        drawLine(CardboardWallColor, Offset(left, bar), Offset(right, bar), 4.dp.toPx())
     }
 }
 
@@ -308,24 +322,28 @@ private fun ClassroomDeskDecorOverlay() {
         // Pencil (top right desk margin)
         rotate(-18f, pivot = Offset(w * 0.88f, h * 0.07f)) {
             val pencilRect = Size(72.dp.toPx(), 12.dp.toPx())
-            val topLeft = Offset(w * 0.88f - pencilRect.width / 2, h * 0.07f - pencilRect.height / 2)
+            val topLeft =
+                Offset(w * 0.88f - pencilRect.width / 2, h * 0.07f - pencilRect.height / 2)
             drawRoundRect(
                 color = Color(0xFFF2C94C),
                 topLeft = topLeft,
                 size = pencilRect,
-                cornerRadius = CornerRadius(4.dp.toPx()),
+                cornerRadius = CornerRadius(4.dp.toPx())
             )
             drawRoundRect(
                 color = Color(0xFF6B4F1D),
                 topLeft = topLeft,
                 size = pencilRect,
                 cornerRadius = CornerRadius(4.dp.toPx()),
-                style = Stroke(width = 1.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx())
             )
             // Pencil tip
             val tipPath = Path().apply {
                 moveTo(topLeft.x + pencilRect.width, topLeft.y)
-                lineTo(topLeft.x + pencilRect.width + 12.dp.toPx(), topLeft.y + pencilRect.height / 2)
+                lineTo(
+                    topLeft.x + pencilRect.width + 12.dp.toPx(),
+                    topLeft.y + pencilRect.height / 2
+                )
                 lineTo(topLeft.x + pencilRect.width, topLeft.y + pencilRect.height)
                 close()
             }
@@ -334,31 +352,32 @@ private fun ClassroomDeskDecorOverlay() {
             drawRect(
                 color = Color(0xFFE76F51),
                 topLeft = topLeft,
-                size = Size(10.dp.toPx(), pencilRect.height),
+                size = Size(10.dp.toPx(), pencilRect.height)
             )
         }
 
         // Eraser (bottom left desk margin)
         rotate(12f, pivot = Offset(w * 0.08f, h * 0.93f)) {
             val eraserSize = Size(36.dp.toPx(), 22.dp.toPx())
-            val topLeft = Offset(w * 0.08f - eraserSize.width / 2, h * 0.93f - eraserSize.height / 2)
+            val topLeft =
+                Offset(w * 0.08f - eraserSize.width / 2, h * 0.93f - eraserSize.height / 2)
             drawRoundRect(
                 color = Color(0xFFF06B6B),
                 topLeft = topLeft,
                 size = eraserSize,
-                cornerRadius = CornerRadius(5.dp.toPx()),
+                cornerRadius = CornerRadius(5.dp.toPx())
             )
             drawRect(
                 color = Color(0xFF5B8DEF),
                 topLeft = Offset(topLeft.x + eraserSize.width * 0.5f, topLeft.y),
-                size = Size(eraserSize.width * 0.5f, eraserSize.height),
+                size = Size(eraserSize.width * 0.5f, eraserSize.height)
             )
             drawRoundRect(
                 color = Color(0xFF7A3940),
                 topLeft = topLeft,
                 size = eraserSize,
                 cornerRadius = CornerRadius(5.dp.toPx()),
-                style = Stroke(width = 1.2.dp.toPx()),
+                style = Stroke(width = 1.2.dp.toPx())
             )
         }
 
@@ -368,15 +387,18 @@ private fun ClassroomDeskDecorOverlay() {
             val clipPath = Path().apply {
                 moveTo(center.x - 6.dp.toPx(), center.y + 12.dp.toPx())
                 cubicTo(
-                    center.x - 14.dp.toPx(), center.y - 10.dp.toPx(),
-                    center.x + 14.dp.toPx(), center.y - 12.dp.toPx(),
-                    center.x + 8.dp.toPx(), center.y + 6.dp.toPx(),
+                    center.x - 14.dp.toPx(),
+                    center.y - 10.dp.toPx(),
+                    center.x + 14.dp.toPx(),
+                    center.y - 12.dp.toPx(),
+                    center.x + 8.dp.toPx(),
+                    center.y + 6.dp.toPx()
                 )
             }
             drawPath(
                 path = clipPath,
                 color = Color(0xFFD64545),
-                style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round),
+                style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
             )
         }
 
@@ -386,15 +408,18 @@ private fun ClassroomDeskDecorOverlay() {
             val clipPath = Path().apply {
                 moveTo(center.x - 6.dp.toPx(), center.y + 12.dp.toPx())
                 cubicTo(
-                    center.x - 14.dp.toPx(), center.y - 10.dp.toPx(),
-                    center.x + 14.dp.toPx(), center.y - 12.dp.toPx(),
-                    center.x + 8.dp.toPx(), center.y + 6.dp.toPx(),
+                    center.x - 14.dp.toPx(),
+                    center.y - 10.dp.toPx(),
+                    center.x + 14.dp.toPx(),
+                    center.y - 12.dp.toPx(),
+                    center.x + 8.dp.toPx(),
+                    center.y + 6.dp.toPx()
                 )
             }
             drawPath(
                 path = clipPath,
                 color = Color(0xFF3973C6),
-                style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round),
+                style = Stroke(width = 2.8.dp.toPx(), cap = StrokeCap.Round)
             )
         }
 
@@ -406,14 +431,14 @@ private fun ClassroomDeskDecorOverlay() {
                 color = Color(0xFFF3E5AB).copy(alpha = 0.72f),
                 topLeft = topLeft,
                 size = tapeSize,
-                cornerRadius = CornerRadius(2.dp.toPx()),
+                cornerRadius = CornerRadius(2.dp.toPx())
             )
             drawRoundRect(
                 color = Color(0xFFD8C784),
                 topLeft = topLeft,
                 size = tapeSize,
                 cornerRadius = CornerRadius(2.dp.toPx()),
-                style = Stroke(width = 1.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx())
             )
         }
     }

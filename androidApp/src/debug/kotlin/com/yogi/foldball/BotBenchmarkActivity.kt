@@ -10,8 +10,8 @@ import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotPlanner
 import com.yogi.foldball.domain.game.bot.BotSearchStats
 import com.yogi.foldball.domain.game.engine.*
-import kotlinx.coroutines.*
 import kotlin.random.Random
+import kotlinx.coroutines.*
 
 /** Debug-only reproducible device benchmark. No entry point in release builds. */
 class BotBenchmarkActivity : ComponentActivity() {
@@ -57,11 +57,22 @@ class BotBenchmarkActivity : ComponentActivity() {
                             if (kind == "shot") trial.finishDefense()
                             val elapsed = withContext(Dispatchers.Default) {
                                 val start = SystemClock.elapsedRealtimeNanos()
-                                if (kind == "defense") planner.chooseDefensePlan(trial, defender(trial)) else planner.chooseShot(trial)
+                                if (kind ==
+                                    "defense"
+                                ) {
+                                    planner.chooseDefensePlan(trial, defender(trial))
+                                } else {
+                                    planner.chooseShot(trial)
+                                }
                                 (SystemClock.elapsedRealtimeNanos() - start) / 1_000_000f
                             }
                             Log.i(TAG, "SAMPLE,${level.name},$kind,$name,$sample,$elapsed")
-                            stats?.let { Log.i(TAG, "METRIC,${level.name},$kind,$name,${it.simulations},${it.formations},${it.replies},${it.tacticalCandidates},${it.budgetExhausted}") }
+                            stats?.let {
+                                Log.i(
+                                    TAG,
+                                    "METRIC,${level.name},$kind,$name,${it.simulations},${it.formations},${it.replies},${it.tacticalCandidates},${it.budgetExhausted}"
+                                )
+                            }
                         }
                     }
                 }
@@ -73,8 +84,13 @@ class BotBenchmarkActivity : ComponentActivity() {
         }
     }
 
-    private fun defender(game: GameEngine): GameTeam =
-        if (game.snapshot.players.first { it.id == game.snapshot.focusedPlayerId }.team == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+    private fun defender(game: GameEngine): GameTeam = if (game.snapshot.players.first { it.id == game.snapshot.focusedPlayerId }.team ==
+        GameTeam.RED
+    ) {
+        GameTeam.BLUE
+    } else {
+        GameTeam.RED
+    }
 
     private fun scenarios(): List<Pair<String, GameEngine>> = buildList {
         for (team in GameTeam.entries) {
@@ -86,7 +102,11 @@ class BotBenchmarkActivity : ComponentActivity() {
             live.setPower(.65f)
             live.shoot()
             var frames = 0
-            while (live.snapshot.phase != GamePhase.DEFENDING && frames++ < 3000) live.step(1f / 120f)
+            while (live.snapshot.phase != GamePhase.DEFENDING &&
+                frames++ < 3000
+            ) {
+                live.step(1f / 120f)
+            }
             check(live.snapshot.phase == GamePhase.DEFENDING)
             add("live-$team" to live)
         }
@@ -98,5 +118,7 @@ class BotBenchmarkActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    companion object { private const val TAG = "FoldballBotBench" }
+    companion object {
+        private const val TAG = "FoldballBotBench"
+    }
 }

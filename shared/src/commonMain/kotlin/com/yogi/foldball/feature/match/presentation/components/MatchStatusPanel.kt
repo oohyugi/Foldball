@@ -18,17 +18,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.core.ui.theme.FoldballShapes
+import com.yogi.foldball.core.ui.theme.FoldballTilt
+import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperCard
+import com.yogi.foldball.core.ui.theme.PaperChip
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
-import com.yogi.foldball.core.ui.theme.FoldballColor
-import com.yogi.foldball.core.ui.theme.FoldballShapes
-import com.yogi.foldball.core.ui.theme.FoldballType
-import com.yogi.foldball.core.ui.theme.FoldballTilt
-import com.yogi.foldball.core.ui.theme.PaperCard
-import com.yogi.foldball.core.ui.theme.PaperChip
-import com.yogi.foldball.core.ui.theme.PaperButton
 import kotlin.math.ceil
 
 @Composable
@@ -44,7 +44,7 @@ fun MatchStatusPanel(
     localTwoPlayers: Boolean = false,
     compactMatchBar: Boolean = false,
     teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     val activeTeam = snapshot.players.first { it.id == snapshot.focusedPlayerId }.team
     val defendingTeam = if (activeTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
@@ -58,11 +58,19 @@ fun MatchStatusPanel(
         } else {
             "TEAM ${teamConfiguration.forTeam(defendingTeam).name} DEFENDING"
         }
+
         GamePhase.AIMING -> "TEAM ${teamConfiguration.forTeam(activeTeam).name} ATTACKING"
+
         GamePhase.BALL_MOVING -> "BALL IN PLAY"
+
         GamePhase.TURNOVER_RETREAT -> "POSSESSION CHANGES"
+
         GamePhase.KICKER_APPROACH -> "KICKER APPROACHING"
-        GamePhase.GOAL -> "TEAM ${snapshot.lastScoringTeam?.let { teamConfiguration.forTeam(it).name }} SCORES"
+
+        GamePhase.GOAL -> "TEAM ${snapshot.lastScoringTeam?.let {
+            teamConfiguration.forTeam(it).name
+        }} SCORES"
+
         GamePhase.MATCH_OVER -> "MATCH COMPLETE"
     }
     val detail = when {
@@ -77,28 +85,57 @@ fun MatchStatusPanel(
 
     if (compactMatchBar) {
         when (snapshot.phase) {
-            GamePhase.DEFENDING -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            GamePhase.DEFENDING -> Box(
+                modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
                 Row(
                     Modifier.padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    PaperChip("UNDO", onUndo, "Undo the last player move", enabled = !isPaused && !isBotTurn && canUndo)
+                    PaperChip(
+                        "UNDO",
+                        onUndo,
+                        "Undo the last player move",
+                        enabled =
+                            !isPaused && !isBotTurn && canUndo
+                    )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            if (localTwoPlayers) "$defensiveMovesUsed/2 players" else buildString {
-                                repeat(2) { index -> append(if (index < defensiveMovesUsed) "● " else "○ ") }
-                            }.trim(),
+                            if (localTwoPlayers) {
+                                "$defensiveMovesUsed/2 players"
+                            } else {
+                                buildString {
+                                    repeat(2) { index ->
+                                        append(
+                                            if (index <
+                                                defensiveMovesUsed
+                                            ) {
+                                                "● "
+                                            } else {
+                                                "○ "
+                                            }
+                                        )
+                                    }
+                                }.trim()
+                            },
                             style = if (localTwoPlayers) FoldballType.Caption else FoldballType.Label,
-                            color = FoldballColor.Ink,
+                            color = FoldballColor.Ink
                         )
-                        if (localTwoPlayers) Text("Tap & drag", style = FoldballType.Caption.copy(fontSize = 12.sp), color = FoldballColor.Ink)
+                        if (localTwoPlayers) {
+                            Text(
+                                "Tap & drag",
+                                style = FoldballType.Caption.copy(fontSize = 12.sp),
+                                color = FoldballColor.Ink
+                            )
+                        }
                     }
                     PaperButton(
                         if (localTwoPlayers) "Ready" else "Finish",
                         onFinishDefense,
                         enabled = !isPaused && !isBotTurn,
-                        compact = true,
+                        compact = true
                     )
                 }
             }
@@ -108,7 +145,7 @@ fun MatchStatusPanel(
                     modifier = Modifier.heightIn(min = 48.dp, max = 56.dp),
                     shape = FoldballShapes.Chip,
                     tilt = FoldballTilt.TapeLabel,
-                    ruled = false,
+                    ruled = false
                 ) {
                     Text(
                         when {
@@ -120,7 +157,7 @@ fun MatchStatusPanel(
                         style = FoldballType.Caption.copy(fontSize = 12.sp),
                         color = FoldballColor.Ink,
                         maxLines = if (localTwoPlayers) 2 else 1,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
             }
@@ -130,7 +167,7 @@ fun MatchStatusPanel(
                     modifier = Modifier.heightIn(min = 48.dp, max = 56.dp),
                     shape = FoldballShapes.Chip,
                     tilt = FoldballTilt.StatusPanel,
-                    ruled = false,
+                    ruled = false
                 ) {
                     Text(
                         if (isPaused) "MATCH PAUSED" else title,
@@ -138,7 +175,7 @@ fun MatchStatusPanel(
                         style = FoldballType.Caption.copy(fontSize = 12.sp),
                         color = teamColor,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -150,35 +187,81 @@ fun MatchStatusPanel(
         modifier = modifier.fillMaxWidth().heightIn(min = 96.dp),
         shape = FoldballShapes.Card,
         tilt = FoldballTilt.StatusPanel,
-        ruled = true,
+        ruled = true
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 11.dp, bottom = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            Modifier.fillMaxWidth().padding(
+                start = 18.dp,
+                end = 18.dp,
+                top = 11.dp,
+                bottom = 10.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, Modifier.weight(1f), style = FoldballType.Label.copy(fontSize = 14.sp), color = teamColor,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (timed) Text("${seconds}s", style = FoldballType.Title, color = if (seconds <= 3) FoldballColor.TeamRed else teamColor)
+                Text(
+                    title,
+                    Modifier.weight(1f),
+                    style = FoldballType.Label.copy(fontSize = 14.sp),
+                    color = teamColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (timed) {
+                    Text(
+                        "${seconds}s",
+                        style = FoldballType.Title,
+                        color = if (seconds <=
+                            3
+                        ) {
+                            FoldballColor.TeamRed
+                        } else {
+                            teamColor
+                        }
+                    )
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(detail, Modifier.weight(1f), style = FoldballType.Caption.copy(fontSize = 12.sp), color = FoldballColor.Ink,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    detail,
+                    Modifier.weight(1f),
+                    style = FoldballType.Caption.copy(fontSize = 12.sp),
+                    color = FoldballColor.Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 if (showPower && snapshot.phase == GamePhase.AIMING) {
-                    Text("${(snapshot.power * 100).toInt()}%", style = FoldballType.Caption, color = FoldballColor.Ink)
+                    Text(
+                        "${(snapshot.power * 100).toInt()}%",
+                        style = FoldballType.Caption,
+                        color = FoldballColor.Ink
+                    )
                 }
                 if (!isPaused && canUndo) {
-                    PaperChip("UNDO", onUndo, "Undo the last player move", Modifier.padding(start = 6.dp))
+                    PaperChip(
+                        "UNDO",
+                        onUndo,
+                        "Undo the last player move",
+                        Modifier.padding(start = 6.dp)
+                    )
                 }
                 if (!isPaused && snapshot.phase == GamePhase.DEFENDING) {
-                    PaperChip("OK", onFinishDefense, "Finish defensive positioning", Modifier.padding(start = 6.dp))
+                    PaperChip(
+                        "OK",
+                        onFinishDefense,
+                        "Finish defensive positioning",
+                        Modifier.padding(start = 6.dp)
+                    )
                 }
             }
             if (timed) {
                 Box(Modifier.fillMaxWidth().height(5.dp)) {
                     Canvas(Modifier.matchParentSize()) {
                         drawRect(FoldballColor.PaperLine.copy(alpha = .72f))
-                        val progress = (snapshot.phaseTimeRemaining / snapshot.phaseTimeTotal).coerceIn(0f, 1f)
+                        val progress = (snapshot.phaseTimeRemaining / snapshot.phaseTimeTotal).coerceIn(
+                            0f,
+                            1f
+                        )
                         drawRect(teamColor, size = size.copy(width = size.width * progress))
                     }
                 }

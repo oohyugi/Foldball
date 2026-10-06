@@ -65,3 +65,31 @@ Score lead mildly favors safe possession, while a deficit favors forward progres
 Launch vertical speed now follows power^5 × 3200 dp/s instead of a fixed 120 dp/s baseline plus a mild cubic term. Low-power touches remain near the ground; full power produces substantial loft. Goal checks interpolate height at the exact swept goal-line crossing and keep the 36 dp opening-height limit. The same physics and uncertainty sampling applies to human and AI shots. No distance-based automatic miss or special AI exception is used.
 
 GoalGeometry now owns the 36 dp opening height and rendering projection. Goal clearance requires the entire ball below the crossbar (lift + diameter < opening height). Vertical overlap reflects off the crossbar and emits the existing post sound/event; a ball fully above the opening is not a goal or post contact.
+
+## Sandbox temporary dent prototype
+
+Disabled by default and not enabled in full matches. Sandbox toggle resets its engine. Contacts below 250 dp/s do not accumulate damage; higher incoming normal speed adds up to 0.6 load per contact, capped at total load 1.0 (100%). Visual dent, strength loss (0–12%), and angle deviation (0–0.025 rad) scale continuously with load; no further damage is accumulated at 100%. Direction deviation follows a deterministic shot-event sequence so engine copies reproduce it; no inventory or permanent repair exists. Condition and accumulated impact load persist through kicker and team-possession changes. Kickoff after a goal clears all conditions; a new match/Sandbox reset starts normal. Existing contact cooldown applies. Simulation copies carry condition and recovery state. This is experimental tuning, not a calibrated material model.
+
+Dented contact physics (Sandbox opt-in): pre-contact damage scales player normal restitution from 0.50 to 0.25, tangential retention from 0.78 to 0.585, and impact hop to 50% at full dent. Intermediate damage interpolates continuously. Newly accumulated damage applies to subsequent contacts. Collider dimensions and standee mass remain unchanged; normal match physics stays unchanged.
+
+## Horizontal shot-speed tuning
+
+Horizontal launch speed is now (120 + 1680 × power²) dp/s, multiplied by condition strength. Full power is capped at 1800 dp/s independent of field height, instead of 3500–4337.5 dp/s. At 50% power the launch is 540 dp/s (previously 568.75 on the reference field); high-power shots keep their loft model. This is gameplay tuning, not measured real-world paper-ball calibration.
+
+## Energy-based Sandbox condition model
+
+Condition uses estimated dissipated relative contact energy: 0.5 × reduced mass × [normal velocity² × (1−restitution²) + tangential velocity² × (1−retention²)], with SI conversion at 0.0035 m/dp and existing 2 g ball/20 g standee masses. Each contact has a 0.0007 J yield threshold; cumulative folding-work capacity is 0.05 J. These are provisional material parameters, not laboratory measurements. Energy is a damage proxy: losses also include heat/sound, and this is not a full paper-shell simulation. Kick energy transfer declines to 45% at full dent; horizontal/vertical launch velocities scale by sqrt(transfer), giving about 67% launch speed. Actual recoil, contact caps, and drag remain dissipative game approximations. No fixed per-hit damage percentage cap. Kickoff resets condition as a gameplay rule, not physical healing.
+
+## Dent control model update
+
+Dent no longer adds automatic shot-angle deviation. Direction uses the chosen aim directly; AI skill error remains independent. Shared power-meter cycle interpolates 1.8→1.3 s from 0→100% dent. Live bot release scheduling and robustness sampling use the same effective condition-aware cycle, gated by the engine prototype flag. Energy-transfer and collision changes remain.
+
+## Optional match rollout and verification
+
+Standee damage is now an optional Home setting, disabled by default and applied to VS AI and local matches. Full matches show percentages only on damaged standees; Sandbox remains available for diagnostics. Android match-size visual comparison verified Front/Back at 0/25/50/100% left/right damage with readable jersey text. JVM validation covers a controlled complete match, kickoff/rematch reset, all 12 difficulty/style combinations with damaged kickers, and 20 bot-vs-bot rallies (3–4 score, damage observed, no deadlock/nonfinite values). This does not substitute for human playtesting or physical-device performance validation.
+
+Match damage is now enabled by default for both modes. The Home checkbox has been removed at user request; a future Settings page may expose configuration. Sandbox remains independently toggleable.
+
+## Persistent match damage
+
+Kickoff after a goal now preserves each standee condition and bend direction. New engine creation (new match, rematch, or Sandbox reset) restores normal condition. The goal-to-kickoff transition only resets formation and motion state; damage remains. Regression tests verify persistence through a complete match and clean condition in a fresh match.

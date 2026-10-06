@@ -43,3 +43,7 @@ Debug Android playback check: launch `com.yogi.foldball/.SoundCheckActivity` and
 ## Victory against AI
 
 `victory.wav` derives from `u_xg7ssi08yr-crowd-cheering-379666.mp3`, source 0.78–4.28 seconds, mono 48 kHz PCM. Source attenuation of 6 dB balances the louder recording; 60 ms fade-in and 700 ms fade-out soften its edges. The 3.5 second clip plays at volume 0.50 after the final whistle (2050 ms delay), only when the RED human wins against the BLUE AI. Local matches keep only the final whistle. Existing muted/background/stopped sequence cancellation applies. Goal cheering remains unchanged.
+
+## Time warnings
+
+`timeout.wav` uses `freesound_community-timeout-90320.mp3`, mono 48 kHz PCM, short edge fades, volume 0.35. Human formation/aim phases cue at 3/2/1 seconds; bot turns do not cue. Full match cues once at 10 seconds and at 3/2/1. Concurrent thresholds produce one sound, with both consumed. Muted/background thresholds are consumed without later replay. Pausing stops frame updates and audio; resume does not duplicate thresholds. End-of-match whistle stays separate after the last shot.

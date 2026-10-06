@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.yogi.foldball.core.ui.theme.FoldballTheme
+import com.yogi.foldball.feature.home.presentation.screen.HomeScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,5 +23,7 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    Main()
+    FoldballTheme {
+        HomeScreen(onMatchClick = {}, onLocalMatchClick = {}, onSandboxClick = {})
+    }
 }
