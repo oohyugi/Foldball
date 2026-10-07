@@ -3,6 +3,7 @@ package com.yogi.foldball
 import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchFormat
 import com.yogi.foldball.domain.game.engine.MatchPlayer
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
@@ -96,6 +97,46 @@ class GameEngineFlowTest {
                 it.id == movable.id
             }.position
         )
+    }
+
+    @Test
+    fun fullMatchStartsAimingAfterOneValidDefensiveMove() {
+        for (format in MatchFormat.entries) {
+            val engine = GameEngine(393f, 580f, targetScore = null, format = format)
+            assertEquals(1, engine.defensiveMoveLimit)
+            val moved = engine.snapshot.players.filter { engine.canMovePlayer(it.id) }.any { player ->
+                (1..GameEngine.ZONE_COUNT).any { zone -> engine.movePlayerToZone(player.id, zone) }
+            }
+            assertTrue(moved)
+            assertEquals(1, engine.defensiveMovesUsed)
+            assertEquals(GamePhase.AIMING, engine.snapshot.phase)
+            assertTrue(!engine.canUndoPlayerMove())
+            assertTrue(!engine.movePlayerToZone("blue-left", 13))
+        }
+    }
+
+    @Test
+    fun ballNearGoalFinishesPlacementBeforeNextKickerApproaches() {
+        val engine = GameEngine(393f, 580f, targetScore = null)
+        GameEngine::class.java.getDeclaredField("focusedPlayerId").apply { isAccessible = true }
+            .set(engine, "blue-striker")
+        GameEngine::class.java.getDeclaredField("ball").apply { isAccessible = true }
+            .set(engine, engine.snapshot.ball.copy(position = Vector2(196.5f, 28f)))
+        GameEngine::class.java.getDeclaredMethod(
+            "beginKickerApproach",
+            Boolean::class.javaPrimitiveType
+        ).apply { isAccessible = true }.invoke(engine, false)
+
+        val kickerStart = engine.snapshot.players.first { it.id == "blue-striker" }.position
+        repeat(12) { engine.step(1f / 120f) }
+        assertEquals(GamePhase.KICKER_APPROACH, engine.snapshot.phase)
+        assertEquals(kickerStart, engine.snapshot.players.first { it.id == "blue-striker" }.position)
+        assertTrue(engine.snapshot.ball.position.y > 28f)
+
+        repeat(14) { engine.step(1f / 120f) }
+        assertEquals(kickerStart, engine.snapshot.players.first { it.id == "blue-striker" }.position)
+        repeat(12) { engine.step(1f / 120f) }
+        assertTrue(engine.snapshot.players.first { it.id == "blue-striker" }.position != kickerStart)
     }
 
     @Test
@@ -279,7 +320,7 @@ class GameEngineFlowTest {
 
         engine.step(1f / 60f)
         assertEquals(GamePhase.KICKER_APPROACH, engine.snapshot.phase)
-        repeat(15) {
+        repeat(20) {
             engine.step(1f / 30f)
             assertPlayersSeparated(engine.snapshot.players)
         }

@@ -2,6 +2,7 @@ package com.yogi.foldball.app.navigation
 
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotStyle
+import com.yogi.foldball.domain.game.engine.MatchFormat
 import com.yogi.foldball.domain.team.BallStyle
 import com.yogi.foldball.domain.team.TeamProfile
 
@@ -22,6 +23,7 @@ data class AppUiState(
     val playAgainstBot: Boolean = true,
     val difficulty: BotDifficulty = BotDifficulty.MEDIUM,
     val style: BotStyle = BotStyle.BALANCED,
+    val matchFormat: MatchFormat = MatchFormat.THREE_V_THREE,
     val ballStyle: BallStyle = BallStyle.CLASSIC,
     val sandboxTab: SandboxTab = SandboxTab.MOVEMENT,
     val error: String? = null
@@ -34,6 +36,7 @@ sealed interface AppIntent {
     data class Play(val againstBot: Boolean) : AppIntent
     data class DifficultySelected(val difficulty: BotDifficulty) : AppIntent
     data class StyleSelected(val style: BotStyle) : AppIntent
+    data class MatchFormatSelected(val format: MatchFormat) : AppIntent
     data class BallStyleSelected(val style: BallStyle) : AppIntent
     data class OpenSandbox(val tab: SandboxTab = SandboxTab.MOVEMENT) : AppIntent
     data class SelectSandboxTab(val tab: SandboxTab) : AppIntent

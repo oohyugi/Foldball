@@ -16,6 +16,11 @@ data class Vector2(val x: Float, val y: Float) {
 }
 
 enum class GameTeam { RED, BLUE }
+
+enum class MatchFormat(val playersPerTeam: Int, val label: String, val description: String) {
+    THREE_V_THREE(3, "3v3", "More space and faster attacks"),
+    FIVE_V_FIVE(5, "5v5", "More players and tighter defense")
+}
 enum class GamePhase { DEFENDING, AIMING, BALL_MOVING, TURNOVER_RETREAT, KICKER_APPROACH, GOAL, MATCH_OVER }
 
 /** Chosen when a match starts; a future settings screen can supply different values. */
@@ -117,11 +122,14 @@ class GameEngine(
     private val targetScore: Int? = 3,
     private val timing: MatchTimingConfig = MatchTimingConfig(),
     initialKickoffTeam: GameTeam = GameTeam.RED,
-    private val dentingEnabled: Boolean = false
+    private val dentingEnabled: Boolean = false,
+    private val format: MatchFormat? = null,
+    private val defensiveBlockWinsPossession: Boolean = false
 ) {
     private var matchTimeExpired = false
     private val ballRadius = 10f
     private val playerRadius = 25f
+    private val standeeCollisionHeight = 52f
 
     // The standee artwork is wider than its ball collider. Keep visible bodies apart
     // without changing how the ball contacts a player.
@@ -153,24 +161,53 @@ class GameEngine(
     private val kickerVisualGap = 1f
     private val playerCollisionDistance = ballRadius + playerRadius + playerCollisionOverlap
     private val possessionTieThreshold = 6f
-    private val maxDefensiveMoves = 2
+    private val maxDefensiveMoves = if (format == null) 2 else 1
     private val movementRadius = 100f
     private val wallInset = 18f
     private val redAttack = -1f
     private val referenceFieldHeight = 580f
     private val goalCelebrationDuration = 2.2f
     private val retreatDuration = .4f
+    private val ballPreparationDuration = .22f
+    private val approachDuration = .36f
 
-    private var players = listOf(
-        player("red-left", GameTeam.RED, 4, offsetTowardAttackRows = .2f),
-        player("red-center", GameTeam.RED, 2, offsetTowardAttackRows = .33f),
-        player("red-right", GameTeam.RED, 6, offsetTowardAttackRows = .2f),
-        player("red-striker", GameTeam.RED, 8),
-        player("blue-left", GameTeam.BLUE, 13, offsetTowardAttackRows = .2f),
-        player("blue-center", GameTeam.BLUE, 17, offsetTowardAttackRows = .33f),
-        player("blue-right", GameTeam.BLUE, 15, offsetTowardAttackRows = .2f),
-        player("blue-striker", GameTeam.BLUE, 11)
-    )
+    private var players = createRoster()
+
+    private fun createRoster(): List<MatchPlayer> {
+        val zones = when (format) {
+            null -> return listOf(
+                player("red-left", GameTeam.RED, 4, offsetTowardAttackRows = .2f),
+                player("red-center", GameTeam.RED, 2, offsetTowardAttackRows = .33f),
+                player("red-right", GameTeam.RED, 6, offsetTowardAttackRows = .2f),
+                player("red-striker", GameTeam.RED, 8),
+                player("blue-left", GameTeam.BLUE, 13, offsetTowardAttackRows = .2f),
+                player("blue-center", GameTeam.BLUE, 17, offsetTowardAttackRows = .33f),
+                player("blue-right", GameTeam.BLUE, 15, offsetTowardAttackRows = .2f),
+                player("blue-striker", GameTeam.BLUE, 11)
+            )
+
+            MatchFormat.THREE_V_THREE -> listOf("left" to 4, "right" to 6, "striker" to 8)
+
+            MatchFormat.FIVE_V_FIVE -> listOf(
+                "left" to 4,
+                "center" to 2,
+                "right" to 6,
+                "midfielder" to 5,
+                "striker" to 8
+            )
+        }
+        return GameTeam.entries.flatMap { team ->
+            zones.map { (role, redZone) ->
+                val zone = if (team == GameTeam.RED) redZone else ZONE_COUNT + 1 - redZone
+                val offset = when (role) {
+                    "left", "right" -> .2f
+                    "center" -> .33f
+                    else -> 0f
+                }
+                player("${team.name.lowercase()}-$role", team, zone, offsetTowardAttackRows = offset)
+            }
+        }
+    }
 
     // Immutable formation anchors. A player's mutable home follows defensive moves
     // during a rally, but every kickoff starts from these original positions.
@@ -187,6 +224,8 @@ class GameEngine(
         "blue-striker"
     }
     private var lastKickingTeam: GameTeam? = null
+    private var defenderBlockedShot = false
+    private var launchingKickerId: String? = null
     private var aimAngle = 0f
     private var power = 0f
     private var soundEvents = SoundEvents()
@@ -241,7 +280,16 @@ class GameEngine(
 
     /** Independent copy for bot planning; immutable player/ball values may be shared. */
     fun copyForSimulation(): GameEngine {
-        val copy = GameEngine(width, height, targetScore, timing, kickoffTeam, dentingEnabled)
+        val copy = GameEngine(
+            width,
+            height,
+            targetScore,
+            timing,
+            kickoffTeam,
+            dentingEnabled,
+            format,
+            defensiveBlockWinsPossession
+        )
         copy.matchTimeExpired = matchTimeExpired
         copy.players = players
         copy.ball = ball
@@ -249,6 +297,8 @@ class GameEngine(
         copy.phaseTimeRemaining = phaseTimeRemaining
         copy.focusedPlayerId = focusedPlayerId
         copy.lastKickingTeam = lastKickingTeam
+        copy.defenderBlockedShot = defenderBlockedShot
+        copy.launchingKickerId = launchingKickerId
         copy.aimAngle = aimAngle
         copy.power = power
         copy.soundEvents = soundEvents
@@ -286,7 +336,9 @@ class GameEngine(
     val fieldHeight: Float get() = height
 
     fun setAimAngle(value: Float) {
-        if (phase == GamePhase.AIMING) aimAngle = value.coerceIn(-1.05f, 1.05f)
+        if (phase == GamePhase.AIMING) {
+            aimAngle = value.coerceIn(-AimDirection.maxAngleRadians, AimDirection.maxAngleRadians)
+        }
     }
 
     /** Use the same reachable destination and move accounting as a human drag. */
@@ -377,10 +429,16 @@ class GameEngine(
             playerDragStartState = null
             playerDragDelta = Vector2(0f, 0f)
             playerDragStartZone = null
+            if (format != null && phase == GamePhase.DEFENDING &&
+                defensiveMovesUsed >= maxDefensiveMoves
+            ) {
+                finishDefense()
+            }
         }
     }
 
     val defensiveMovesUsed: Int get() = defensiveMoveHistory.size
+    val defensiveMoveLimit: Int get() = maxDefensiveMoves
 
     fun canUndoPlayerMove(): Boolean = phase == GamePhase.DEFENDING && playerDragId == null && defensiveMoveHistory.isNotEmpty()
 
@@ -401,7 +459,10 @@ class GameEngine(
 
     fun finishDefense(): Boolean {
         if (phase != GamePhase.DEFENDING) return false
-        playerDragId?.let(::endPlayerMove)
+        playerDragId?.let {
+            endPlayerMove(it)
+            if (phase != GamePhase.DEFENDING) return true
+        }
         phase = GamePhase.AIMING
         phaseTimeRemaining = timing.attackSeconds.toFloat()
         return true
@@ -508,7 +569,10 @@ class GameEngine(
     }
 
     fun aimBy(deltaX: Float) {
-        if (phase == GamePhase.AIMING) aimAngle = (aimAngle + deltaX / 120f).coerceIn(-1.05f, 1.05f)
+        if (phase == GamePhase.AIMING) {
+            aimAngle = (aimAngle + deltaX / 120f)
+                .coerceIn(-AimDirection.maxAngleRadians, AimDirection.maxAngleRadians)
+        }
     }
 
     fun chargeBy(deltaY: Float) {
@@ -526,13 +590,13 @@ class GameEngine(
         lastShotPower = power
         openingKickoffPending = false
         lastKickingTeam = player.team
+        defenderBlockedShot = false
+        launchingKickerId = player.id
         shotKickerAnchor = player.position
         // The ball starts only 1 dp outside the kicker's collision radius. Ignore
         // that player briefly so the launch cannot immediately rebound backward.
         contactCooldownByPlayerId[player.id] = playerContactCooldown
-        val forward = if (player.team == GameTeam.RED) redAttack else -redAttack
-        val shotAngle = aimAngle
-        val direction = Vector2(sin(shotAngle) * -forward, cos(shotAngle) * forward)
+        val direction = AimDirection.shotVector(player.team, aimAngle)
         // Cap horizontal launch speed independently of field length; high power adds loft.
         val strength = if (dentingEnabled) player.condition.shotStrength else 1f
         val appliedPower = power * power
@@ -682,11 +746,14 @@ class GameEngine(
         }
         if (phase == GamePhase.KICKER_APPROACH) {
             approachElapsed += dt
-            val progress = (approachElapsed / .36f).coerceIn(0f, 1f)
-            val eased = progress * progress * (3f - 2f * progress)
+            val ballProgress = (approachElapsed / ballPreparationDuration).coerceIn(0f, 1f)
+            val ballEased = ballProgress * ballProgress * (3f - 2f * ballProgress)
+            val progress = ((approachElapsed - ballPreparationDuration) / approachDuration)
+                .coerceIn(0f, 1f)
+            val playerEased = progress * progress * (3f - 2f * progress)
             val from = approachFrom ?: return
             val to = approachTo ?: return
-            val position = from + (to - from) * eased
+            val position = from + (to - from) * playerEased
             players = players.map {
                 if (it.id ==
                     focusedPlayerId
@@ -699,7 +766,7 @@ class GameEngine(
             separatePlayerBodies(protectedId = focusedPlayerId)
             val ballFrom = approachBallFrom ?: return
             val ballTo = approachBallTo ?: return
-            ball = ball.copy(position = ballFrom + (ballTo - ballFrom) * eased)
+            ball = ball.copy(position = ballFrom + (ballTo - ballFrom) * ballEased)
             if (progress >= 1f) {
                 // Formation starts at the settled positions, including the previous
                 // kicker and bodies displaced during approach. Stale home anchors
@@ -872,12 +939,29 @@ class GameEngine(
         val movement = position - previousPosition
         val travelVelocity = if (dt > 0f) movement * (1f / dt) else Vector2(0f, 0f)
 
+        // A backward pass crosses the shooter's collider. Restore normal contact
+        // only after the launch cooldown and after the ball has cleared that body.
+        launchingKickerId?.let { id ->
+            val kicker = players.firstOrNull { it.id == id }
+            if (kicker == null ||
+                (
+                    (contactCooldownByPlayerId[id] ?: 0f) <= 0f &&
+                        (position - kicker.position).length() > playerCollisionDistance + 1f
+                    )
+            ) {
+                launchingKickerId = null
+            }
+        }
+
         val collision = players.mapNotNull { player ->
+            if (player.id == launchingKickerId) return@mapNotNull null
             if ((contactCooldownByPlayerId[player.id] ?: 0f) > 0f) return@mapNotNull null
             val center = player.position
             val time =
                 firstCircleContactTime(previousPosition, position, center, playerCollisionDistance)
                     ?: return@mapNotNull null
+            val heightAtContact = ball.height + (motion.height - ball.height) * time
+            if (heightAtContact >= standeeCollisionHeight) return@mapNotNull null
             val contactPoint = previousPosition + movement * time
             val difference = contactPoint - center
             val distance = difference.length()
@@ -902,6 +986,9 @@ class GameEngine(
             soundEvents = soundEvents.copy(blocks = soundEvents.blocks + 1)
             soundEvents = soundEvents.copy(impacts = soundEvents.impacts + 1)
             val player = collision.player
+            if (defensiveBlockWinsPossession && lastKickingTeam != null && player.team != lastKickingTeam) {
+                defenderBlockedShot = true
+            }
             val normal = collision.normal
             val previousSpeed = velocity.length()
             val relativeVelocity = velocity - player.velocity
@@ -1000,6 +1087,9 @@ class GameEngine(
 
         val red = nearest(GameTeam.RED)
         val blue = nearest(GameTeam.BLUE)
+        if (defensiveBlockWinsPossession && defenderBlockedShot && lastKickingTeam != null) {
+            return if (lastKickingTeam == GameTeam.RED) blue else red
+        }
         val redDistance = (red.position - ball.position).length()
         val blueDistance = (blue.position - ball.position).length()
         if (abs(redDistance - blueDistance) < possessionTieThreshold) {
@@ -1259,6 +1349,8 @@ class GameEngine(
     }
 
     private fun beginKickoff(team: GameTeam) {
+        defenderBlockedShot = false
+        launchingKickerId = null
         players = players.map { player ->
             val kickoffHome = when {
                 player.id == "red-striker" -> strikerKickoffPosition(

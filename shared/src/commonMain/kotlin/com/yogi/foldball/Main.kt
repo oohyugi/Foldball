@@ -1,5 +1,7 @@
 package com.yogi.foldball
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -114,7 +116,15 @@ private fun FoldballRoot(startAtHome: Boolean) {
                 LocalGameAudio provides audio
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    NavHost(navController, startDestination = "loading", modifier = Modifier.fillMaxSize()) {
+                    NavHost(
+                        navController,
+                        startDestination = "loading",
+                        modifier = Modifier.fillMaxSize(),
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None }
+                    ) {
                         composable("loading") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                                 Column(Modifier.padding(24.dp)) {
@@ -161,6 +171,10 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                     style = state.style,
                                     onStyleChange = {
                                         appViewModel.onIntent(AppIntent.StyleSelected(it))
+                                    },
+                                    matchFormat = state.matchFormat,
+                                    onMatchFormatChange = {
+                                        appViewModel.onIntent(AppIntent.MatchFormatSelected(it))
                                     },
                                     difficulty = state.difficulty,
                                     onDifficultyChange = {
@@ -216,6 +230,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                 playAgainstBot = state.playAgainstBot,
                                 botDifficulty = state.difficulty,
                                 botStyle = state.style,
+                                matchFormat = state.matchFormat,
                                 ballStyle = state.ballStyle,
                                 teamConfiguration = MatchTeamConfiguration(
                                     red =

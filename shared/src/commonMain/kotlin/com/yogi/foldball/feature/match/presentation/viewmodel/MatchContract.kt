@@ -6,6 +6,7 @@ import com.yogi.foldball.domain.game.bot.BotStyle
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchFormat
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
@@ -18,7 +19,8 @@ data class MatchOptions(
     val style: BotStyle,
     val standeeDamage: Boolean,
     val timing: MatchTimingConfig,
-    val teams: MatchTeamConfiguration
+    val teams: MatchTeamConfiguration,
+    val format: MatchFormat = MatchFormat.THREE_V_THREE
 )
 
 data class MatchUiState(

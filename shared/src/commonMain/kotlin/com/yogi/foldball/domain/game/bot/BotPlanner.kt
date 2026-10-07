@@ -354,7 +354,7 @@ class BotPlanner(
         return strongest
     }
 
-    /** Beam includes staying put and legal one/two-move defensive formations. */
+    /** Beam includes staying put and each legal defensive move allowed by this match. */
     private suspend fun formationBeam(
         engine: GameEngine,
         team: GameTeam,
@@ -363,7 +363,7 @@ class BotPlanner(
     ): List<Formation> {
         val original = Formation(engine.copyForSimulation(), emptyList())
         var beam = listOf(original)
-        repeat(2) {
+        repeat(engine.defensiveMoveLimit) {
             val expanded = beam.toMutableList()
             for (formation in beam) {
                 for (player in formation.engine.snapshot.players.filter {
@@ -400,7 +400,7 @@ class BotPlanner(
             currentCoroutineContext().ensureActive()
             val trial = engine.copyForSimulation()
             val fallback = buildList {
-                repeat(if (difficulty == BotDifficulty.EASY) 1 else 2) {
+                repeat(if (difficulty == BotDifficulty.EASY) 1 else trial.defensiveMoveLimit) {
                     if (!budget.expired) {
                         chooseDefense(trial, team)?.let { move ->
                             if (trial.movePlayerToZone(move.playerId, move.zone)) add(move)

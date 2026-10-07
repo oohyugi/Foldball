@@ -42,7 +42,6 @@ fun MatchStatusPanel(
     onUndo: () -> Unit,
     onFinishDefense: () -> Unit,
     isBotTurn: Boolean = false,
-    localTwoPlayers: Boolean = false,
     compactMatchBar: Boolean = false,
     teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
     modifier: Modifier = Modifier
@@ -95,45 +94,13 @@ fun MatchStatusPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    PaperChip(
-                        "UNDO",
-                        onUndo,
-                        "Undo the last player move",
-                        enabled =
-                            !isPaused && !isBotTurn && canUndo
+                    Text(
+                        if (isBotTurn) "BOT POSITIONING" else "MOVE 1 DEFENDER",
+                        style = FoldballType.Caption.copy(fontSize = 12.sp),
+                        color = FoldballColor.Ink
                     )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            if (localTwoPlayers) {
-                                "$defensiveMovesUsed/2 players"
-                            } else {
-                                buildString {
-                                    repeat(2) { index ->
-                                        append(
-                                            if (index <
-                                                defensiveMovesUsed
-                                            ) {
-                                                "● "
-                                            } else {
-                                                "○ "
-                                            }
-                                        )
-                                    }
-                                }.trim()
-                            },
-                            style = if (localTwoPlayers) FoldballType.Caption else FoldballType.Label,
-                            color = FoldballColor.Ink
-                        )
-                        if (localTwoPlayers) {
-                            Text(
-                                "Tap & drag",
-                                style = FoldballType.Caption.copy(fontSize = 12.sp),
-                                color = FoldballColor.Ink
-                            )
-                        }
-                    }
                     PaperButton(
-                        if (localTwoPlayers) "Ready" else "Finish",
+                        "Skip",
                         onFinishDefense,
                         enabled = !isPaused && !isBotTurn,
                         compact = true
@@ -151,13 +118,12 @@ fun MatchStatusPanel(
                     Text(
                         when {
                             isBotTurn -> "BOT IS AIMING"
-                            localTwoPlayers -> "Drag kicker to aim\nHold, set power, then release"
-                            else -> "←   MOVE PLAYER TO AIM   →"
+                            else -> "Drag kicker to aim\nHold for power, then release"
                         },
                         modifier = Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
                         style = FoldballType.Caption.copy(fontSize = 12.sp),
                         color = FoldballColor.Ink,
-                        maxLines = if (localTwoPlayers) 2 else 1,
+                        maxLines = 2,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }

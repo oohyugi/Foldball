@@ -36,7 +36,7 @@ class KickerStanceTest {
                     isAccessible =
                         true
                 }.invoke(e, true)
-                repeat(50) { e.step(1f / 120f) }
+                repeat(75) { e.step(1f / 120f) }
                 val state = e.snapshot
                 val kicker = state.players.first { it.id == id }
                 assertEquals(GamePhase.DEFENDING, state.phase)

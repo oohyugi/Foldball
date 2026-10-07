@@ -67,10 +67,12 @@ import com.yogi.foldball.core.ui.theme.TapeLabel
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotStyle
 import com.yogi.foldball.domain.game.bot.ShotPowerMeter
+import com.yogi.foldball.domain.game.engine.AimDirection
 import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.GoalGeometry
+import com.yogi.foldball.domain.game.engine.MatchFormat
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
@@ -88,6 +90,7 @@ import com.yogi.foldball.feature.match.presentation.viewmodel.MatchViewModel
 import com.yogi.foldball.gamekit.presentation.ball.MatchBallVisualSize
 import com.yogi.foldball.gamekit.presentation.ball.PaperBall
 import com.yogi.foldball.gamekit.presentation.field.ClassroomStadium
+import com.yogi.foldball.gamekit.presentation.field.drawPaperAimGuide
 import com.yogi.foldball.gamekit.presentation.player.PaperPlayer
 import com.yogi.foldball.gamekit.presentation.player.PlayerFacing
 import com.yogi.foldball.gamekit.presentation.player.PlayerFocusState
@@ -123,6 +126,7 @@ fun FullMatchScreen(
     playAgainstBot: Boolean = true,
     botDifficulty: BotDifficulty = BotDifficulty.MEDIUM,
     botStyle: BotStyle = BotStyle.BALANCED,
+    matchFormat: MatchFormat = MatchFormat.THREE_V_THREE,
     ballStyle: BallStyle = BallStyle.CLASSIC,
     standeeDamage: Boolean = true,
     timing: MatchTimingConfig = MatchTimingConfig(),
@@ -133,6 +137,7 @@ fun FullMatchScreen(
     playAgainstBot = playAgainstBot,
     botDifficulty = botDifficulty,
     botStyle = botStyle,
+    matchFormat = matchFormat,
     ballStyle = ballStyle,
     standeeDamage = standeeDamage,
     timing = timing,
@@ -146,6 +151,7 @@ private fun MatchExperienceScreen(
     playAgainstBot: Boolean = false,
     botDifficulty: BotDifficulty = BotDifficulty.MEDIUM,
     botStyle: BotStyle = BotStyle.BALANCED,
+    matchFormat: MatchFormat = MatchFormat.THREE_V_THREE,
     ballStyle: BallStyle = BallStyle.CLASSIC,
     standeeDamage: Boolean = false,
     timing: MatchTimingConfig,
@@ -158,7 +164,7 @@ private fun MatchExperienceScreen(
     val playerMotion = rememberPlayerMotionState()
     val audio = LocalGameAudio.current
     val viewModel: MatchViewModel = koinViewModel(
-        key = "match:$fullMatch",
+        key = "match:$fullMatch:$playAgainstBot:$botDifficulty:$botStyle:$matchFormat:$standeeDamage:$timing",
         parameters = {
             parametersOf(
                 MatchOptions(
@@ -168,7 +174,8 @@ private fun MatchExperienceScreen(
                     botStyle,
                     standeeDamage,
                     timing,
-                    baseTeamConfiguration
+                    baseTeamConfiguration,
+                    matchFormat
                 )
             )
         }
@@ -362,6 +369,10 @@ private fun MatchExperienceScreen(
             LaunchedEffect(state.phase, formationOpen) {
                 val oldPhase = previousHapticPhase
                 if (oldPhase != state.phase) {
+                    if (oldPhase == GamePhase.AIMING) {
+                        isPowerTiming = false
+                        powerTimingElapsed = 0f
+                    }
                     when (state.phase) {
                         GamePhase.DEFENDING, GamePhase.AIMING ->
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -387,6 +398,7 @@ private fun MatchExperienceScreen(
                     }
                 }
                 previousHapticPhase = state.phase
+                showAimGuide = state.phase == GamePhase.AIMING
                 if (!formationOpen) {
                     selectedFormationPlayerId = null
                     movingPlayerId = null
@@ -881,26 +893,13 @@ private fun MatchExperienceScreen(
                             val ballX = ball.x * density
                             val ballY = ball.y * density
                             val player = state.players.first { it.id == state.focusedPlayerId }
-                            val forward = if (player.team == GameTeam.RED) -1f else 1f
+                            val aimDirection = AimDirection.shotVector(player.team, state.aimAngle)
                             val end = Offset(
-                                ballX + sin(state.aimAngle) * -forward * h * .29f,
-                                ballY + cos(state.aimAngle) * forward * h * .29f
+                                ballX + aimDirection.x * h * .29f,
+                                ballY + aimDirection.y * h * .29f
                             )
                             if (state.phase == GamePhase.AIMING && showAimGuide) {
-                                drawLine(
-                                    Color(0xFFE94F43).copy(alpha = .88f),
-                                    Offset(ballX, ballY),
-                                    end,
-                                    3.dp.toPx(),
-                                    cap = StrokeCap.Round,
-                                    pathEffect = PathEffect.dashPathEffect(
-                                        floatArrayOf(
-                                            7.dp.toPx(),
-                                            5.dp.toPx()
-                                        )
-                                    )
-                                )
-                                drawCircle(Color(0xFFE94F43), 3.5.dp.toPx(), end)
+                                drawPaperAimGuide(Offset(ballX, ballY), end)
                             }
                         }
 
@@ -1104,6 +1103,7 @@ private fun MatchExperienceScreen(
                                     "center" -> "1"
                                     "left" -> "2"
                                     "right" -> "3"
+                                    "midfielder" -> "4"
                                     else -> "9"
                                 },
                                 name = teamConfiguration.forTeam(player.team).jerseyLabel
@@ -1366,7 +1366,6 @@ private fun MatchExperienceScreen(
                                 defensiveMovesUsed = viewModel.defensiveMovesUsed,
                                 canUndo = !botTurn && viewModel.canUndoPlayerMove(),
                                 isBotTurn = botTurn,
-                                localTwoPlayers = fullMatch && !playAgainstBot,
                                 isPaused = isPaused,
                                 showPower = !fullMatch,
                                 teamConfiguration = teamConfiguration,

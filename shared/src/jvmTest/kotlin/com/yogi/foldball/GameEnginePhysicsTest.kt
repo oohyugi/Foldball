@@ -235,12 +235,13 @@ class GameEnginePhysicsTest {
     }
 
     @Test
-    fun redFullPowerHitOnBlueLosesEnergyWithoutImmediateRepeat() {
+    fun redFastGroundBallHitOnBlueLosesEnergyWithoutImmediateRepeat() {
         for (frame in frameDurations) {
             val engine = GameEngine(393f, 470f)
             assertTrue(engine.finishDefense())
             engine.setPower(1f)
             assertTrue(engine.shoot())
+            keepShotGrounded(engine)
             assertPlayerContactReboundsOnce(
                 engine,
                 GameTeam.BLUE,
@@ -251,7 +252,7 @@ class GameEnginePhysicsTest {
     }
 
     @Test
-    fun blueFullPowerHitOnRedLosesEnergyWithoutImmediateRepeat() {
+    fun blueFastGroundBallHitOnRedLosesEnergyWithoutImmediateRepeat() {
         for (frame in frameDurations) {
             val engine = GameEngine(393f, 470f)
             assertTrue(engine.finishDefense())
@@ -270,6 +271,7 @@ class GameEnginePhysicsTest {
             assertTrue(engine.finishDefense())
             engine.setPower(1f)
             assertTrue(engine.shoot())
+            keepShotGrounded(engine)
             assertPlayerContactReboundsOnce(
                 engine,
                 GameTeam.RED,
@@ -277,6 +279,12 @@ class GameEnginePhysicsTest {
                 frame = frame
             )
         }
+    }
+
+    private fun keepShotGrounded(engine: GameEngine) {
+        val grounded = engine.snapshot.ball.copy(height = 0f, verticalVelocity = 0f)
+        GameEngine::class.java.getDeclaredField("ball").apply { isAccessible = true }
+            .set(engine, grounded)
     }
 
     private fun assertPlayerContactReboundsOnce(

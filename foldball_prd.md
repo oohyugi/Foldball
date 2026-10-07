@@ -1029,6 +1029,8 @@ Contoh:
 - cetak gol dalam 3 shot;
 - jangan kebobolan.
 
+Rencana tantangan per match, rekor pribadi, dan leaderboard dijabarkan pada bagian 55.
+
 ---
 
 ## 42. AI — MVP
@@ -1457,3 +1459,26 @@ Fitur ini ditunda. Prioritas saat ini tetap kontrol, fisika, keterbacaan visual,
 ### 54.6 Current delivery — basic club identity
 
 Basic Welcome name/badge selection, local profile persistence, Home edit, randomized distinct opponent badges in both match modes, and scoreboard badges are now implemented. Jersey customization, inventory, trading, accounts, and gameplay items remain future scope. Local Player 2 receives a random fictional club with a badge different from the saved human club.
+
+---
+
+## 55. Future Roadmap — Tantangan Match dan Rekor
+
+**Status: ide retensi setelah core match terasa seru dan aturan AI/scoring stabil; belum termasuk MVP.** Tantangan memberi alasan untuk memainkan satu match lagi tanpa menambah fase atau kontrol saat bermain.
+
+### 55.1 Tantangan per match
+
+- Tampilkan satu target opsional yang singkat sebelum match, lalu hasilnya pada layar akhir. Contoh: cetak gol lewat pantulan dinding, menang tanpa kebobolan, atau cetak gol dalam batas jumlah shot.
+- Pemain tetap bisa bermain normal ketika target gagal. Tantangan tidak mengubah fisika, durasi, atau aturan pertandingan.
+- Validasi target dari event gameplay yang benar-benar tercatat; jangan menebak pantulan atau jenis gol dari posisi akhir bola.
+- Hadiah awal berupa progres, statistik, atau kosmetik; tidak meningkatkan kekuatan tim.
+
+### 55.2 Rekor pribadi
+
+Simpan progres lokal seperti kemenangan beruntun, gol terbanyak dalam satu match, dan jumlah tantangan selesai. Tampilkan rekor baru secara ringkas setelah match agar rematch terasa punya tujuan. Definisi statistik dan aturan reset ditetapkan sebelum implementasi.
+
+### 55.3 Leaderboard mingguan
+
+Pertimbangkan leaderboard online setelah tantangan, scoring, dan AI stabil. Semua peserta memainkan kondisi mingguan yang sama, termasuk format, tingkat kesulitan, gaya AI, dan aturan match. Usulan peringkat: jumlah kemenangan, lalu selisih gol sebagai pemecah seri; jangan gunakan total gol seumur hidup karena lebih mengukur waktu bermain. Perlu akun/identitas, penyimpanan server, validasi hasil, dan penanganan kecurangan sebelum dirilis.
+
+**Urutan uji:** tantangan per match → rekor pribadi lokal → leaderboard mingguan. Ukur apakah pemain memilih rematch, menyelesaikan tantangan, dan tetap menikmati match tanpa merasa dibebani target.

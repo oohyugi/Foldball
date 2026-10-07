@@ -8,6 +8,7 @@ import com.yogi.foldball.domain.game.bot.BotPlanner
 import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchRuleFlags
 import com.yogi.foldball.domain.game.engine.Vector2
 import com.yogi.foldball.domain.team.withAiOpponent
 import com.yogi.foldball.domain.team.withLocalOpponentBadge
@@ -193,7 +194,9 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
             targetScore = if (options.fullMatch) 3 else null,
             timing = options.timing,
             initialKickoffTeam = state.value.openingKickoffTeam ?: GameTeam.RED,
-            dentingEnabled = state.value.dentingEnabled
+            dentingEnabled = state.value.dentingEnabled,
+            format = if (options.fullMatch) options.format else null,
+            defensiveBlockWinsPossession = options.fullMatch && MatchRuleFlags.DEFENSIVE_BLOCK_WINS_POSSESSION
         )
         publish()
     }

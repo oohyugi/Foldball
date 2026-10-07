@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.yogi.foldball.domain.game.engine.AimDirection
 import kotlin.math.sqrt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -60,7 +61,7 @@ class PlayerMotionState internal constructor() {
     }
 
     suspend fun setAimAngle(angle: Float) {
-        aimAngle.snapTo(angle.coerceIn(-1.05f, 1.05f))
+        aimAngle.snapTo(angle.coerceIn(-AimDirection.maxAngleRadians, AimDirection.maxAngleRadians))
     }
 
     /** Horizontal striker drag changes aim without moving the focused player's stance. */

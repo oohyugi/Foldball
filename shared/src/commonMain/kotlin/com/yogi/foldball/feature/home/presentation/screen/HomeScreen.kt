@@ -37,6 +37,7 @@ import com.yogi.foldball.core.ui.theme.PaperDialog
 import com.yogi.foldball.core.ui.theme.TapeLabel
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotStyle
+import com.yogi.foldball.domain.game.engine.MatchFormat
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.team.BallStyle
 import com.yogi.foldball.domain.team.TeamIdentity
@@ -54,6 +55,8 @@ fun HomeScreen(
     onDifficultyChange: (BotDifficulty) -> Unit = {},
     style: BotStyle = BotStyle.BALANCED,
     onStyleChange: (BotStyle) -> Unit = {},
+    matchFormat: MatchFormat = MatchFormat.THREE_V_THREE,
+    onMatchFormatChange: (MatchFormat) -> Unit = {},
     ballStyle: BallStyle = BallStyle.CLASSIC,
     onBallStyleChange: (BallStyle) -> Unit = {},
     club: TeamIdentity? = null,
@@ -62,7 +65,8 @@ fun HomeScreen(
     onArenaClick: () -> Unit = {},
     onHowToPlayClick: () -> Unit = {}
 ) {
-    var showDifficulty by remember { mutableStateOf(false) }
+    var showMatchSetup by remember { mutableStateOf(false) }
+    var setupAgainstBot by remember { mutableStateOf(true) }
     var showHowToPlayDialog by remember { mutableStateOf(false) }
     var showBallStyleDialog by remember { mutableStateOf(false) }
 
@@ -90,8 +94,14 @@ fun HomeScreen(
                 TapeLabel("READY FOR KICKOFF", Modifier.align(Alignment.TopCenter), compact = true)
             }
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(FoldballSpace.sm)) {
-                PaperButton("PLAY VS AI", { showDifficulty = true }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Primary)
-                PaperButton("PLAY 2 PLAYER", onLocalMatchClick, Modifier.fillMaxWidth(), style = PaperButtonStyle.Secondary)
+                PaperButton("PLAY VS AI", {
+                    setupAgainstBot = true
+                    showMatchSetup = true
+                }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Primary)
+                PaperButton("PLAY 2 PLAYER", {
+                    setupAgainstBot = false
+                    showMatchSetup = true
+                }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Secondary)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FoldballSpace.md)) {
                 DeskMenuCard(
@@ -135,45 +145,60 @@ fun HomeScreen(
         }
     }
 
-    if (showDifficulty) {
+    if (showMatchSetup) {
         PaperDialog(
-            title = "VS AI",
-            message = style.description,
-            onDismiss = { showDifficulty = false },
+            title = if (setupAgainstBot) "VS AI" else "2 Players",
+            message = if (setupAgainstBot) "Choose your match format, then set up the AI." else "Choose the match format for both players.",
+            onDismiss = { showMatchSetup = false },
             confirmText = "Play",
             dismissText = "Cancel",
             onConfirm = {
-                showDifficulty = false
-                onMatchClick()
+                showMatchSetup = false
+                if (setupAgainstBot) onMatchClick() else onLocalMatchClick()
             },
             content = {
                 Column(
-                    Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Difficulty", style = FoldballType.Label, color = FoldballColor.Ink)
+                    Text("Match format", style = FoldballType.Label, color = FoldballColor.Ink)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BotDifficulty.entries.forEach { level ->
+                        MatchFormat.entries.forEach { option ->
                             PaperChip(
-                                level.label,
-                                { onDifficultyChange(level) },
-                                "AI difficulty ${level.label}: ${level.description}",
+                                option.label,
+                                { onMatchFormatChange(option) },
+                                "${option.label}: ${option.description}",
                                 modifier = Modifier.weight(1f),
-                                selected = difficulty == level
+                                selected = matchFormat == option
                             )
                         }
                     }
-                    Text("Play style", style = FoldballType.Label, color = FoldballColor.Ink)
-                    BotStyle.entries.chunked(2).forEach { row ->
+                    Text(matchFormat.description, style = FoldballType.Body, color = FoldballColor.InkMuted)
+                    if (setupAgainstBot) {
+                        Text("Difficulty", style = FoldballType.Label, color = FoldballColor.Ink)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { tactic ->
+                            BotDifficulty.entries.forEach { level ->
                                 PaperChip(
-                                    tactic.label,
-                                    { onStyleChange(tactic) },
-                                    "AI style ${tactic.label}: ${tactic.description}",
+                                    level.label,
+                                    { onDifficultyChange(level) },
+                                    "AI difficulty ${level.label}: ${level.description}",
                                     modifier = Modifier.weight(1f),
-                                    selected = style == tactic
+                                    selected = difficulty == level
                                 )
+                            }
+                        }
+                        Text("Play style", style = FoldballType.Label, color = FoldballColor.Ink)
+                        BotStyle.entries.chunked(2).forEach { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { tactic ->
+                                    PaperChip(
+                                        tactic.label,
+                                        { onStyleChange(tactic) },
+                                        "AI style ${tactic.label}: ${tactic.description}",
+                                        modifier = Modifier.weight(1f),
+                                        selected = style == tactic
+                                    )
+                                }
                             }
                         }
                     }

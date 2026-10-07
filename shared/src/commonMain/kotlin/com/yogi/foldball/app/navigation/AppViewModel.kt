@@ -48,6 +48,8 @@ class AppViewModel(
 
             is AppIntent.StyleSelected -> state.update { it.copy(style = intent.style) }
 
+            is AppIntent.MatchFormatSelected -> state.update { it.copy(matchFormat = intent.format) }
+
             is AppIntent.BallStyleSelected -> state.update { it.copy(ballStyle = intent.style) }
 
             is AppIntent.OpenSandbox -> {
