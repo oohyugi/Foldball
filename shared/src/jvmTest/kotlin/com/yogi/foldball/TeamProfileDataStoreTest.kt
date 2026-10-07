@@ -2,6 +2,7 @@ package com.yogi.foldball
 
 import com.yogi.foldball.data.local.createTeamProfileDataStore
 import com.yogi.foldball.data.repository.DataStoreTeamProfileRepository
+import com.yogi.foldball.domain.team.JerseyPattern
 import com.yogi.foldball.domain.team.TeamProfile
 import java.nio.file.Files
 import kotlin.test.Test
@@ -18,7 +19,7 @@ class TeamProfileDataStoreTest {
     @Test fun savedProfileSurvivesStoreRecreation() = runBlocking {
         val directory = Files.createTempDirectory("foldball-team-test").toFile()
         val path = directory.resolve("team.preferences_pb").absolutePath
-        val profile = requireNotNull(TeamProfile.create("Saved Club", 11, "SAVE"))
+        val profile = requireNotNull(TeamProfile.create("Saved Club", 11, "SAVE", JerseyPattern.HOOPS, 4))
         val job = SupervisorJob()
         val store = createTeamProfileDataStore(path, CoroutineScope(job + Dispatchers.IO))
         try {

@@ -41,7 +41,7 @@ fun PaperBall(
     impactStrength: Float = 0f
 ) {
     CrumpledBall(
-        modifier = modifier.semantics { contentDescription = "Foldball paper ball" },
+        modifier = modifier.semantics { contentDescription = "${ballStyle.label} ball" },
         ballStyle = ballStyle,
         rotationX = rotationX,
         rotationY = rotationY,

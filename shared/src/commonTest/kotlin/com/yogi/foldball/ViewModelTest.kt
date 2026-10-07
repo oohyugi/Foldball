@@ -7,9 +7,9 @@ import com.yogi.foldball.app.navigation.AppRoute
 import com.yogi.foldball.app.navigation.AppViewModel
 import com.yogi.foldball.domain.repository.TeamProfileRepository
 import com.yogi.foldball.domain.team.TeamProfile
-import com.yogi.foldball.feature.team.presentation.viewmodel.TeamEffect
-import com.yogi.foldball.feature.team.presentation.viewmodel.TeamIntent
-import com.yogi.foldball.feature.team.presentation.viewmodel.TeamViewModel
+import com.yogi.foldball.feature.club.presentation.viewmodel.ClubEffect
+import com.yogi.foldball.feature.club.presentation.viewmodel.ClubIntent
+import com.yogi.foldball.feature.club.presentation.viewmodel.ClubViewModel
 import com.yogi.foldball.feature.welcome.presentation.viewmodel.WelcomeEffect
 import com.yogi.foldball.feature.welcome.presentation.viewmodel.WelcomeIntent
 import com.yogi.foldball.feature.welcome.presentation.viewmodel.WelcomeViewModel
@@ -42,7 +42,7 @@ class ViewModelTest {
     @Test fun existingProfileOpensHomeWithoutWelcomeAndEditorLoadsItsValues() = vmTest {
         val repository = FakeTeamRepository(saved)
         val app = keep(AppViewModel(repository, startAtHome = true))
-        val team = keep(TeamViewModel(repository))
+        val team = keep(ClubViewModel(repository))
         assertEquals(AppRoute.Loading, app.uiState.value.initialRoute)
         runCurrent()
         assertEquals(AppRoute.Home, app.uiState.value.initialRoute)
@@ -71,7 +71,7 @@ class ViewModelTest {
         assertEquals("New Club", repository.value.value?.name)
         assertEquals("NC", result.profile.shortName)
         assertEquals(1, repository.saves)
-        app.onIntent(AppIntent.TeamSaved(result.profile))
+        app.onIntent(AppIntent.ClubSaved(result.profile))
         assertEquals(result.profile, app.uiState.value.profile)
     }
 
@@ -104,10 +104,10 @@ class ViewModelTest {
 
     @Test fun saveFailureKeepsDraftAndAllowsRetryWithoutNavigation() = vmTest {
         val repository = FakeTeamRepository(saved).apply { failSave = true }
-        val team = keep(TeamViewModel(repository))
+        val team = keep(ClubViewModel(repository))
         runCurrent()
-        team.onIntent(TeamIntent.NameChanged("Edited Club"))
-        team.onIntent(TeamIntent.Save)
+        team.onIntent(ClubIntent.NameChanged("Edited Club"))
+        team.onIntent(ClubIntent.Save)
         runCurrent()
         assertEquals(saved, repository.value.value)
         assertEquals("Edited Club", team.uiState.value.name)
@@ -115,25 +115,25 @@ class ViewModelTest {
         assertFalse(team.uiState.value.saving)
         repository.failSave = false
         val effect = async { team.effects.first() }
-        team.onIntent(TeamIntent.Save)
+        team.onIntent(ClubIntent.Save)
         runCurrent()
-        assertEquals("Edited Club", assertIs<TeamEffect.Saved>(effect.await()).profile.name)
+        assertEquals("Edited Club", assertIs<ClubEffect.Saved>(effect.await()).profile.name)
     }
 
     @Test fun loadErrorCannotOverwriteExistingProfileAndRetryRestoresIt() = vmTest {
         val repository = FakeTeamRepository(saved).apply { failRead = true }
         val app = keep(AppViewModel(repository, true))
-        val team = keep(TeamViewModel(repository))
+        val team = keep(ClubViewModel(repository))
         runCurrent()
         assertEquals(AppRoute.Loading, app.uiState.value.initialRoute)
         assertNotNull(app.uiState.value.error)
         assertTrue(team.uiState.value.loadFailed)
-        team.onIntent(TeamIntent.NameChanged("Overwrite"))
+        team.onIntent(ClubIntent.NameChanged("Overwrite"))
         assertFalse(team.uiState.value.canSave)
         assertEquals(0, repository.saves)
         repository.failRead = false
         app.onIntent(AppIntent.RetryProfile)
-        team.onIntent(TeamIntent.Retry)
+        team.onIntent(ClubIntent.Retry)
         runCurrent()
         assertEquals(AppRoute.Home, app.uiState.value.initialRoute)
         assertEquals(saved, team.uiState.value.profile)
@@ -141,13 +141,13 @@ class ViewModelTest {
 
     @Test fun cancellingEditorPreservesStoredTeam() = vmTest {
         val repository = FakeTeamRepository(saved)
-        val team = keep(TeamViewModel(repository))
+        val team = keep(ClubViewModel(repository))
         runCurrent()
-        team.onIntent(TeamIntent.NameChanged("Unsaved"))
+        team.onIntent(ClubIntent.NameChanged("Unsaved"))
         val effect = async { team.effects.first() }
-        team.onIntent(TeamIntent.Cancel)
+        team.onIntent(ClubIntent.Cancel)
         runCurrent()
-        assertEquals(TeamEffect.Cancelled, effect.await())
+        assertEquals(ClubEffect.Cancelled, effect.await())
         assertEquals(saved, repository.value.value)
         assertEquals(0, repository.saves)
     }
@@ -155,15 +155,15 @@ class ViewModelTest {
     @Test fun editingExistingTeamRequestsTeamDestination() = vmTest {
         val app = keep(AppViewModel(FakeTeamRepository(saved), true))
         runCurrent()
-        app.onIntent(AppIntent.EditTeam)
-        assertEquals(AppRoute.Team, app.destinations.first())
+        app.onIntent(AppIntent.EditClub)
+        assertEquals(AppRoute.Club, app.destinations.first())
         assertEquals(AppRoute.Home, app.uiState.value.initialRoute)
     }
 
     @Test fun missingProfileCannotEnterTeamManagement() = vmTest {
         val app = keep(AppViewModel(FakeTeamRepository(), true))
         runCurrent()
-        app.onIntent(AppIntent.EditTeam)
+        app.onIntent(AppIntent.EditClub)
         assertEquals(AppRoute.Welcome, app.destinations.first())
     }
 

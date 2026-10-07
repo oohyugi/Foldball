@@ -11,6 +11,8 @@ import okio.Path.Companion.toPath
 internal object TeamProfileKeys {
     val name = stringPreferencesKey("name")
     val shortName = stringPreferencesKey("short_name")
+    val jerseyColorCount = intPreferencesKey("jersey_color_count")
+    val jerseyPattern = stringPreferencesKey("jersey_pattern")
     val badge = intPreferencesKey("badge")
 }
 

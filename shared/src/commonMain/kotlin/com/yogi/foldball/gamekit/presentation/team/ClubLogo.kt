@@ -19,6 +19,15 @@ import foldball.shared.generated.resources.club_logo_13
 import foldball.shared.generated.resources.club_logo_14
 import foldball.shared.generated.resources.club_logo_15
 import foldball.shared.generated.resources.club_logo_16
+import foldball.shared.generated.resources.club_logo_17
+import foldball.shared.generated.resources.club_logo_18
+import foldball.shared.generated.resources.club_logo_19
+import foldball.shared.generated.resources.club_logo_20
+import foldball.shared.generated.resources.club_logo_21
+import foldball.shared.generated.resources.club_logo_22
+import foldball.shared.generated.resources.club_logo_23
+import foldball.shared.generated.resources.club_logo_24
+import foldball.shared.generated.resources.club_logo_25
 import org.jetbrains.compose.resources.painterResource
 @Composable fun ClubLogo(id: Int?, description: String, modifier: Modifier = Modifier) {
     val resource = when (id) {
@@ -38,6 +47,15 @@ import org.jetbrains.compose.resources.painterResource
         14 -> Res.drawable.club_logo_14
         15 -> Res.drawable.club_logo_15
         16 -> Res.drawable.club_logo_16
+        17 -> Res.drawable.club_logo_17
+        18 -> Res.drawable.club_logo_18
+        19 -> Res.drawable.club_logo_19
+        20 -> Res.drawable.club_logo_20
+        21 -> Res.drawable.club_logo_21
+        22 -> Res.drawable.club_logo_22
+        23 -> Res.drawable.club_logo_23
+        24 -> Res.drawable.club_logo_24
+        25 -> Res.drawable.club_logo_25
         else -> return
     }
     Image(painterResource(resource), contentDescription = description, modifier = modifier)

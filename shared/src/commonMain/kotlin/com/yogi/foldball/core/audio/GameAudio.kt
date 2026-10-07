@@ -8,6 +8,11 @@ import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.SoundEvents
 import foldball.shared.generated.resources.Res
 
+private val soundAssets = listOf(
+    "crumple", "kick", "bounce", "impact", "post", "goal", "defeat", "cheer", "whistle", "kickoff", "victory", "timeout", "countdown_tick",
+    "turn_player_defend", "turn_player_attack", "turn_opponent_defend", "turn_opponent_attack"
+)
+
 interface SoundPlayer {
     suspend fun load(name: String, bytes: ByteArray)
     fun play(name: String, volume: Float)
@@ -15,10 +20,7 @@ interface SoundPlayer {
     fun close()
 }
 suspend fun readSoundAsset(name: String): ByteArray {
-    require(
-        name in
-            listOf("crumple", "kick", "bounce", "impact", "post", "goal", "defeat", "cheer", "whistle", "kickoff", "victory", "timeout")
-    )
+    require(name in soundAssets)
     return Res.readBytes("files/audio/$name.wav")
 }
 
@@ -83,7 +85,7 @@ val LocalGameAudio = staticCompositionLocalOf<GameAudio?> { null }
     val player = rememberSoundPlayer()
     val audio = remember(player) { GameAudio(player) }
     LaunchedEffect(player) {
-        listOf("crumple", "kick", "bounce", "impact", "post", "goal", "defeat", "cheer", "whistle", "kickoff", "victory", "timeout").forEach {
+        soundAssets.forEach {
             player.load(it, readSoundAsset(it))
             audio.markLoaded(it)
         }

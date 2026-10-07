@@ -48,7 +48,7 @@ Use `FoldballColor` instead of defining screen-local equivalents.
 | `Tape` | `#F4D34A` | Emphasis, focus, and selection |
 | `Grass` | `#3F8F43` | Green paper/field accents |
 | `Cardboard` | `#C99A62` | Arena walls and cardboard details |
-| `InkMuted` | `#777A80` | Secondary technical labels |
+| `InkMuted` | `#62656B` | Secondary technical labels |
 | `FieldPaper` | `#E8E1D4` | Neutral paper arena used by visual labs |
 | `FieldLine` | `#C7BFAF` | Arena linework |
 | `FieldHighlight` | `#F1EBE0` | Light arena highlights |
@@ -137,6 +137,17 @@ Use the shared components before writing screen-local `Box`, `clip`, shadow, or 
 A component receives display data, accessibility text, and callbacks from its owner. It must not decide gameplay rules or navigation destinations.
 
 ## 6. Accessibility and Layout
+
+### Text contrast (WCAG 2.2 AA baseline)
+
+Use [WCAG 2.2 SC 1.4.3](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum) as the contrast baseline: normal text needs at least 4.5:1; large text needs at least 3:1 (18 pt regular or 14 pt bold equivalent). Use 4.5:1 for Foldball body, caption, and handwritten labels unless their large-text eligibility has been verified.
+
+- Place page headings and descriptions on shared PaperCard surfaces with Ink text. Ink on Paper is 15.03:1. Do not place InkMuted subtitles directly on wood: the previous pairing was only 1.08:1.
+- InkMuted is #62656B, intended for secondary text on Paper (5.18:1). It is not a universal color for text on wood, grass, tape, or images.
+- Assess foreground against the actual rendered background, including texture, transparency, gradients, overlays, and disabled/selected states. Put text on an opaque shared surface when contrast cannot be ensured.
+- Keep error messages readable on Paper and loading text on wood in Paper. Never rely on color alone to identify an error.
+- Verify text wrapping and font scaling without clipping or obscuring actions, preserve 48 dp touch targets and semantics, and inspect on a device. Contrast measurements alone do not establish full WCAG compliance.
+
 
 - Give every interactive control a minimum 48dp hit area, even when the visible icon is smaller.
 - Supply meaningful content descriptions for icon-only actions.
@@ -251,7 +262,7 @@ All user-facing UI text and accessibility labels must be in English (preserve us
 
 ## Welcome and club identity
 
-First launch opens Welcome within safe drawing insets. Require a trimmed nonempty team name up to 20 characters and a badge from the 16 bundled WebP assets. Badge choices use equal-width PaperCards with minimum 64 dp targets, radio selection semantics, and Tape selected fill; PaperCard accepts a shared-token color override. Team-name entry uses Material OutlinedTextField with Foldball body typography inside PaperCard. Continue saves the profile locally; Home exposes Edit. AI and local opponents draw from badges excluding the human selection; select once per match. Badge appears with name and score in Match. Original PNG references are preserved; runtime badges are 256×256 WebP.
+First launch opens Welcome within safe drawing insets. Require a trimmed nonempty team name up to 20 characters and a badge from the 25 bundled WebP assets. Badge choices use equal-width PaperCards with minimum 64 dp targets, radio selection semantics, and Tape selected fill; PaperCard accepts a shared-token color override. Team-name entry uses Material OutlinedTextField with Foldball body typography inside PaperCard. Continue saves the profile locally; Home exposes Edit. AI and local opponents draw from badges excluding the human selection; select once per match. Badge appears with name and score in Match. Original PNG references are preserved; runtime badges are 256×256 WebP.
 
 - Scoreboard badge layout is compact: each equal-width team column has a 36 dp badge beside its 30 sp score, with an 11 sp single-line name below. Mirror badge placement at the outer edges of the two score groups; reserve 48 dp for the centered 17 sp countdown. Do not stack badge, score, and name as three separate rows.
 
@@ -266,3 +277,61 @@ First launch opens Welcome within safe drawing insets. Require a trimmed nonempt
 - Home field preview is a decorative 150 dp portrait-pitch strip in a shared Grass PaperCard with a subtle tilt and paper shadow. Blue standees face Front in the upper row; red standees face Back in the lower row. Keep complete bodies and shadows inside the crop, with a centered paper ball, horizontal halfway line, quiet paper bands, and slim Cardboard side rails. Hide decorative preview children from accessibility traversal.
 
 - Welcome is the first-launch onboarding destination while no saved team profile exists. After Continue saves successfully, replace Welcome with Home so Back cannot reopen onboarding. Team is a separate management destination opened from Home: load the saved name, short name, and crest; Save or Cancel returns Home. Both routes use shared paper form controls, preserve drafts on save failure, and receive safe drawing insets from the app root.
+
+- Additional crest references from `referensi_assets/foldball_ball_assets/logo/` are appended as badge IDs 17–25 in numeric source-filename order. Runtime images remain 256×256 transparent WebP; existing badge IDs 1–16 stay stable. Welcome, Team, and opponent selection use the shared badge catalog.
+
+- Welcome keeps Continue outside the scrollable form, pinned at the bottom within the root safe insets and above the keyboard. Use a compact paper heading with a live club preview. Show four badge shortcuts; choosing another badge from See all badges replaces the fourth shortcut with that selection. The full catalog lives in a scrollable PaperDialog, closes on selection, and preserves the draft. Use three dialog columns on narrow widths to retain 48 dp touch targets. The form may scroll on short screens; Continue never requires scrolling.
+
+- Home's Club entry displays the saved crest, club name (up to two lines with ellipsis), and Manage your club subtitle. The entire paper card is a shared PressableSurface with menu tilt, shadow, press feedback, and button semantics; it opens Team management. Do not duplicate it with an Edit action in the header.
+
+- Home uses a compact marker wordmark above a field hero, with a READY FOR KICKOFF TapeLabel. The decorative field reflects the selected ball style and saved crest; the ball rocks gently in place without changing geometry. Place both Play actions directly below the field. Remove inactive placeholder settings actions.
+- `DeskMenuCard` is the shared paper equipment-menu component: shared PressableSurface, alternating menu tilts, a 64 dp art slot, two-line reserved title/subtitle areas, and full-card button semantics. Home's Club shows the saved crest/name, Ball the chosen ball, Arena a miniature pitch sketch, and How to play a ruled tactics notebook. Use shared colors and spacings throughout; decorative art is excluded from accessibility.
+
+- Club management lives in `feature/club/` (`ClubScreen`, `ClubRoute`, `ClubViewModel`, `ClubContract`, `ClubModule`) and uses AppRoute.Club. Gameplay TeamProfile/TeamIdentity remain domain concepts. The screen uses a compact high-contrast identity preview, a Club name counter attached to that field, and four crest shortcuts with a full catalog dialog. Shared `ClubBadgeGrid` renders both Welcome and Club selections. Cancel and Save club remain outside the scrollable body and above the keyboard; save errors preserve the draft. Do not show inactive jersey/customization controls before those features exist.
+
+- `PaperBackButton` is a reusable 48×48 dp paper icon action with an arrow, Go back accessibility label, shared press feedback, and an enabled state. Its owner supplies navigation; do not embed route logic in the component. `FoldballTopBar` places this action in its own paper chip beside a centered title on a separate content-sized PaperCard, with symmetric trailing space. Keep it outside scrollable content; safe insets come from the route root. Club uses this top bar separately from its centered crest/name identity card, disables Back while saving, and omits the redundant introductory subtitle.
+
+- Top bars expose the wood background between the Back chip and the separate title paper; do not wrap the entire bar in one paper surface. Initial profile loading shows no loading copy; preserve a visible failure message and Retry action when reading fails.
+
+- Default jerseys derive from the curated `ClubKit` crest palette (25 stable mappings), without runtime image extraction or new persistence fields. Club shows a live paper-standee preview; changing crest changes jersey panels only. RED/BLUE remain internal gameplay sides. Match jersey, scoreboard, turn/formation indicators, toss, goal, and result colors use `MatchTeamConfiguration.kitColor`. The opponent keeps its crest color unless squared RGB distance is below 0.09; in that case select the most distinct curated alternate. This is a visual clash heuristic, not a WCAG or color-vision accessibility guarantee; keep names, crest, and positional indicators. Home's decorative players follow the same palette.
+
+- Jersey patterns support Plain, Stripes (vertical), Hoops (horizontal), and Chevron on both Front and Back panels. Apply patterns inside the existing warped jersey clip; preserve paper folds, print, shadows, collisions, and player geometry. Club offers Match crest plus four pattern chips with selected semantics and a live preview. An explicit pattern is persisted with the profile; absent/unknown stored values use the curated crest default. Selecting another crest retains an explicit override; Match crest restores automatic selection. Home and Match use the saved pattern.
+
+- Club top bar shows the draft club name with a 48 dp Edit club name pencil action. `FoldballTopBar.actions` accepts an optional reusable trailing action slot. Club separates Crest (large crest, shortcuts, catalog action) and Jersey (large centered standee and pattern chips) on opaque paper cards. Name/short name move to an edit dialog: Cancel discards dialog changes, Apply validates and updates the screen draft, and Save club persists everything. `PaperDialog.confirmEnabled` disables Apply for invalid names.
+
+- Current jersey default is Plain for every crest; remove Match crest/automatic pattern controls. Existing explicitly saved patterns remain selected. Club uses a 104 dp standee preview. Two tone splits the jersey vertically into the crest primary and a contrasting curated dark companion (navy or gold), keeping printing readable; apply the same split to Front/Back and preserve existing paper geometry and physics. This supersedes crest-derived pattern defaults; crest still determines primary color.
+
+- Club crest shortcuts sit on the desk outside the selected-crest PaperCard. See all badges uses a centered, content-width compact PaperButton below the shortcuts; avoid nesting its paper/shadow inside another paper surface.
+
+- Club's logo shortcuts now use a horizontal `ClubLogoStrip` with 10 items and a fixed 48 dp grid-icon catalog action on the right (See all badges). Each shortcut is a 64 dp radio target, selected in Tape, with room for paper tilt/shadows. If the selected logo is outside IDs 1–10, replace the tenth shortcut with it and scroll it into view. The catalog dialog remains available; remove the separate See all badges text button from Club. Welcome keeps its existing shortcut layout.
+
+- Horizontal Club logo shortcuts reserve roughly 35% of the next card at the viewport edge to reveal scrollability. Adapt card width to available space while retaining at least 64×64 dp selection targets. The grid action stays fixed outside the scrolling region.
+
+- Club separates Jersey colors (1–4) from Plain/Stripes/Hoops/Chevron. Curated crest palettes provide a primary plus three logo-derived accents or matching neutrals. With two colors, Plain uses split panels and other patterns use the second palette color; third color adds collar/hem trim and fourth adds thin side accents. Multi-color kits print white names/numbers with a fine Ink outline for readability; never use opaque rectangular patches. Preserve warped clips and gameplay geometry. Save color count with the profile; old Two tone selections load as two colors and are presented as Plain plus 2 colors.
+
+- User-facing terminology is Club badge everywhere: section titles, picker dialogs, catalog actions, and accessibility labels. Use Choose your badge, Select a badge for your club, and See all badges. Do not mix logo or crest into UI copy; existing internal identifiers may retain those names.
+
+- `FoldballTopBar.subtitle` optionally shows a smaller centered caption below the title on the same paper. Club supplies the draft short name (including the auto-generated abbreviation when blank); editing updates both immediately after Apply. Omit the subtitle on screens that do not need it.
+
+- Club's top bar title is Your Club. The badge card has no Club badge heading: center the badge, full club name, short name, and Edit club name pencil action together.
+- AI identities map to play style: Balanced = Paperford FC (PAPF, badge 20), Park the Bus = Ironwood FC (IRON, 18), Kick & Rush = Falcon United (FALC, 19), Total Football = Aurora Athletic (AURA, 24). Difficulty changes bot skill, not identity. Use a fixed themed alternate badge (9/4/22/8 respectively) only if the human uses the main badge. Resolve the complete match identity once; Play again retains name, badge, kit palette, and pattern. Local Player 2 keeps a local identity rather than an AI club. This supersedes randomized opponent identity rules.
+
+- The status label directly below Match scoreboard uses the acting team jersey color as its background: defending team during formation, possession team during kick/motion, scoring team during Goal. Match complete uses neutral Tape. TapeLabel accepts background/content colors and selects the higher-contrast Ink/Paper foreground by luminance. Keep team names and live-region semantics; colors never replace textual turn information.
+
+- Do not play countdown warnings for total match time approaching zero. Human-turn countdown cues at 3/2/1 seconds use timeout volume 0.25 (previously 0.35), play once per threshold, and consume muted thresholds without replay. The final whistle/result sounds remain tied to match completion.
+
+- Formation/aiming entry cues use original synthesized mono PCM wood knocks: RED/Player 1 has rising two-note knocks, BLUE/Player 2/AI falling knocks. Attack adds a short paper-flick tail. Clips last 250–340 ms at volume 0.3, fire once per phase entry, and replace the phase-entry kickoff whistle. Consume muted/paused transitions without replay; no cues during toss, Sandbox, or other phases. Keep visual actor/action text and team-color status; stop playback on pause/background/exit.
+
+- Multicolor jersey printing uses a thin font-scaled Ink outline underneath the white text. Both layers share the standee deformation and placement. Remove black backing rectangles from names and numbers.
+
+- Match status TapeLabel uses the emphasized 16 sp caption variant with 0.5 sp tracking, 4 dp vertical padding, and a 1 dp Ink border around the acting-team color surface. Keep the same field-size calculation and polite live-region text; ellipsize long single-line messages instead of growing arena layout. Other tape labels retain their existing sizes.
+
+- Match status below the scoreboard identifies clubs by their saved short name (`jerseyLabel`) in every formation, kick, possession, turnover, and goal label, including local handoffs. Full names remain in Club and match results.
+
+- Turn countdown audio uses an original synthesized 110 ms soft wood tap (countdown_tick) at volume 0.25, retaining once-per-threshold 3/2/1-second human-turn reminders only. The lower-left phase timer uses `TurnTimer`: a fixed 52×48 dp paper chip, 24 sp Ink text, and a 1 dp Ink border; fill changes Paper to Tape for the final three seconds. Keep its size stable, expose remaining seconds with the club short name, and preserve field geometry.
+
+- Toss reserves the same upper status-label measurement and 56 dp bottom control slot as full-match phases. Keep the hidden toss status out of accessibility and render a noninteractive bottom spacer. The SpaceBetween arena column then retains the same field position before and after kickoff; do not change field dimensions or physics to compensate.
+
+- Home field standees display the saved club short name and style-mapped AI club short name instead of hardcoded player names. Kit colors, palette, pattern, and color count follow the same identities. Keep printing single-line with ellipsis for long names; Match status still uses short names.
+
+- Opening kickoff toss starts automatically as soon as the 1.2-second paper-crumple animation finishes. Remove the Start button; choose the kickoff team once, launch the existing bounce trajectory, show the settled result briefly, and enter formation. Preserve toss physics, field position, selected ball style, and club identity.

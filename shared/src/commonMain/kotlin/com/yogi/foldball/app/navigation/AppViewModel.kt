@@ -30,11 +30,11 @@ class AppViewModel(
         when (intent) {
             AppIntent.RetryProfile -> observeProfile()
 
-            AppIntent.EditTeam -> {
-                navigation.trySend(if (state.value.profile == null) AppRoute.Welcome else AppRoute.Team)
+            AppIntent.EditClub -> {
+                navigation.trySend(if (state.value.profile == null) AppRoute.Welcome else AppRoute.Club)
             }
 
-            is AppIntent.TeamSaved -> {
+            is AppIntent.ClubSaved -> {
                 state.update { it.copy(profile = intent.profile) }
             }
 

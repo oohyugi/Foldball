@@ -3,7 +3,6 @@ package com.yogi.foldball.feature.home.presentation.screen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,8 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yogi.foldball.core.ui.theme.CrumpledBall
+import com.yogi.foldball.core.ui.theme.DeskMenuCard
 import com.yogi.foldball.core.ui.theme.FoldballColor
 import com.yogi.foldball.core.ui.theme.FoldballScaffold
+import com.yogi.foldball.core.ui.theme.FoldballSpace
 import com.yogi.foldball.core.ui.theme.FoldballTilt
 import com.yogi.foldball.core.ui.theme.FoldballType
 import com.yogi.foldball.core.ui.theme.PaperButton
@@ -36,8 +37,11 @@ import com.yogi.foldball.core.ui.theme.PaperDialog
 import com.yogi.foldball.core.ui.theme.TapeLabel
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotStyle
+import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.team.BallStyle
 import com.yogi.foldball.domain.team.TeamIdentity
+import com.yogi.foldball.domain.team.withAiOpponent
+import com.yogi.foldball.feature.home.presentation.components.DeskMenuArt
 import com.yogi.foldball.feature.home.presentation.components.MenuField
 import com.yogi.foldball.gamekit.presentation.team.ClubLogo
 
@@ -53,8 +57,7 @@ fun HomeScreen(
     ballStyle: BallStyle = BallStyle.CLASSIC,
     onBallStyleChange: (BallStyle) -> Unit = {},
     club: TeamIdentity? = null,
-    onEditClub: () -> Unit = {},
-    onTeamClick: () -> Unit = {},
+    onClubClick: () -> Unit = {},
     onBallClick: () -> Unit = {},
     onArenaClick: () -> Unit = {},
     onHowToPlayClick: () -> Unit = {}
@@ -65,145 +68,69 @@ fun HomeScreen(
 
     FoldballScaffold(modifier = Modifier.fillMaxSize()) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 24.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = FoldballSpace.sm, vertical = FoldballSpace.md),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(FoldballSpace.md)
         ) {
-            // Top Bar
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                PaperChip("📝", {}, "Edit your club")
-                PaperChip("⚙️", {}, "Settings")
+                Text("Fold", style = FoldballType.Display.copy(fontSize = 38.sp), color = FoldballColor.Paper)
+                Text("Ball", style = FoldballType.Display.copy(fontSize = 38.sp), color = FoldballColor.Tape)
+                CrumpledBall(Modifier.padding(start = FoldballSpace.sm), size = 32.dp, ballStyle = ballStyle)
             }
-
-            // Title Banner
-            PaperCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                tilt = FoldballTilt.Hero,
-                ruled = false
-            ) {
-                Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 22.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            "Fold",
-                            style = FoldballType.Display.copy(fontSize = 48.sp),
-                            color = FoldballColor.Ink
-                        )
-                        Text(
-                            "Ball",
-                            style = FoldballType.Display.copy(fontSize = 48.sp),
-                            color = FoldballColor.InkBlue
-                        )
-                        CrumpledBall(size = 40.dp, ballStyle = BallStyle.CLASSIC)
-                    }
-                    TapeLabel("Paper football game")
-                }
-            }
-
-            // Field Strip
-            MenuField(Modifier.fillMaxWidth())
-
-            // Play Mode Buttons
-            Column(
-                Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                PaperButton(
-                    text = "PLAY VS AI",
-                    onClick = { showDifficulty = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    style = PaperButtonStyle.Primary
+            Box(Modifier.fillMaxWidth()) {
+                MenuField(
+                    Modifier.fillMaxWidth().padding(top = FoldballSpace.sm),
+                    ballStyle = ballStyle,
+                    teams = MatchTeamConfiguration(red = club ?: MatchTeamConfiguration.Default.red).withAiOpponent(style)
                 )
-                PaperButton(
-                    text = "PLAY 2 PLAYER",
-                    onClick = onLocalMatchClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = PaperButtonStyle.Secondary
-                )
+                TapeLabel("READY FOR KICKOFF", Modifier.align(Alignment.TopCenter), compact = true)
             }
-
-            // 2x2 Grid Cards (Team, Ball, Arena, How to play)
-            Column(
-                Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(FoldballSpace.sm)) {
+                PaperButton("PLAY VS AI", { showDifficulty = true }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Primary)
+                PaperButton("PLAY 2 PLAYER", onLocalMatchClick, Modifier.fillMaxWidth(), style = PaperButtonStyle.Secondary)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FoldballSpace.md)) {
+                DeskMenuCard(
+                    title = club?.name ?: "Your Club",
+                    subtitle = "Manage your club",
+                    tilt = FoldballTilt.MenuCardOne,
+                    onClick = onClubClick,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    PaperCard(
-                        modifier = Modifier.weight(1f).clickable(onClick = onTeamClick),
-                        ruled = true
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Team", style = FoldballType.Title, color = FoldballColor.Ink)
-                            club?.let {
-                                ClubLogo(it.logoId, it.name, Modifier.size(36.dp))
-                            }
-                        }
-                    }
-                    PaperCard(
-                        modifier = Modifier.weight(1f).clickable(onClick = { showBallStyleDialog = true }),
-                        ruled = true
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Ball", style = FoldballType.Title, color = FoldballColor.Ink)
-                            CrumpledBall(size = 36.dp, ballStyle = ballStyle)
-                        }
-                    }
+                    ClubLogo(club?.logoId, "Club badge", Modifier.size(56.dp))
                 }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                DeskMenuCard(
+                    title = "Ball",
+                    subtitle = ballStyle.label,
+                    tilt = FoldballTilt.MenuCardTwo,
+                    onClick = { showBallStyleDialog = true },
+                    modifier = Modifier.weight(1f)
                 ) {
-                    PaperCard(
-                        modifier = Modifier.weight(1f).clickable(onClick = onArenaClick),
-                        ruled = true
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("Arena", style = FoldballType.Title, color = FoldballColor.Ink)
-                            Text("Sandbox", style = FoldballType.Label, color = FoldballColor.InkBlue)
-                        }
-                    }
-                    PaperCard(
-                        modifier = Modifier.weight(1f).clickable(onClick = {
-                            showHowToPlayDialog = true
-                            onHowToPlayClick()
-                        }),
-                        ruled = true
-                    ) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("How to play", style = FoldballType.Title, color = FoldballColor.Ink)
-                            Text("Rules & Guide", style = FoldballType.Label, color = FoldballColor.InkBlue)
-                        }
-                    }
+                    CrumpledBall(size = 52.dp, ballStyle = ballStyle)
                 }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(FoldballSpace.md)) {
+                DeskMenuCard(
+                    title = "Arena",
+                    subtitle = "Practice & explore",
+                    tilt = FoldballTilt.MenuCardThree,
+                    onClick = onArenaClick,
+                    modifier = Modifier.weight(1f)
+                ) { DeskMenuArt(notebook = false) }
+                DeskMenuCard(
+                    title = "How to play",
+                    subtitle = "Learn the basics",
+                    tilt = FoldballTilt.MenuCardFour,
+                    onClick = {
+                        showHowToPlayDialog = true
+                        onHowToPlayClick()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { DeskMenuArt(notebook = true) }
             }
         }
     }

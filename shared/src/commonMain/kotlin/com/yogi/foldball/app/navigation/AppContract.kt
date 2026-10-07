@@ -9,7 +9,7 @@ sealed interface AppRoute {
     data object Loading : AppRoute
     data object Welcome : AppRoute
     data object Home : AppRoute
-    data object Team : AppRoute
+    data object Club : AppRoute
     data object Sandbox : AppRoute
     data object Match : AppRoute
 }
@@ -29,8 +29,8 @@ data class AppUiState(
 
 sealed interface AppIntent {
     data object RetryProfile : AppIntent
-    data object EditTeam : AppIntent
-    data class TeamSaved(val profile: TeamProfile) : AppIntent
+    data object EditClub : AppIntent
+    data class ClubSaved(val profile: TeamProfile) : AppIntent
     data class Play(val againstBot: Boolean) : AppIntent
     data class DifficultySelected(val difficulty: BotDifficulty) : AppIntent
     data class StyleSelected(val style: BotStyle) : AppIntent

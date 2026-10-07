@@ -1,10 +1,9 @@
 package com.yogi.foldball.core.audio
 
-/** Consumes each threshold once, even muted; a new phase resets only turn cues. */
+/** Warns only near the end of a human turn; muted thresholds are consumed once. */
 class CountdownCue {
     private var phaseKey: String? = null
     private val turnCues = mutableSetOf<Int>()
-    private val matchCues = mutableSetOf<Int>()
     fun update(
         phase: String,
         turnSeconds: Int,
@@ -16,9 +15,8 @@ class CountdownCue {
             phaseKey = phase
             turnCues.clear()
         }
-        val matchDue = matchSeconds in setOf(10, 3, 2, 1) && matchCues.add(matchSeconds)
         val turnDue =
             humanTurn && matchSeconds > 0 && turnSeconds in 1..3 && turnCues.add(turnSeconds)
-        return active && (matchDue || turnDue)
+        return active && turnDue
     }
 }

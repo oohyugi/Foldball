@@ -25,11 +25,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yogi.foldball.core.ui.theme.FoldballColor
+import com.yogi.foldball.domain.team.JerseyPattern
+import com.yogi.foldball.gamekit.presentation.team.ClubKit
 import kotlin.math.PI
 
 /** Shared paper standee renderer. Gameplay position and collision stay outside this visual. */
@@ -53,9 +58,16 @@ fun PaperPlayer(
     impactDirectionY: Float = 0f,
     impactStrength: Float = 0f,
     jerseyColor: Color = PlayerRed,
+    jerseyPattern: JerseyPattern = JerseyPattern.PLAIN,
+    jerseyColorCount: Int = if (jerseyPattern == JerseyPattern.TWO_TONE) 2 else 1,
+    jerseyPalette: List<Color> = listOf(jerseyColor, ClubKit.accent(jerseyColor), FoldballColor.Paper, FoldballColor.Tape),
     number: String = "10",
     name: String = "SATO"
 ) {
+    val tones = jerseyColorCount.coerceIn(1, 4)
+    val secondColor = jerseyPalette.getOrElse(1) { ClubKit.accent(jerseyColor) }
+    val thirdColor = jerseyPalette.getOrElse(2) { FoldballColor.Paper }
+    val fourthColor = jerseyPalette.getOrElse(3) { FoldballColor.Tape }
     val dentAmount = dentProgress.coerceIn(0f, 1f)
     val bendSide = dentDirectionX.coerceIn(-1f, 1f)
     val bendDepth = dentDirectionY.coerceIn(-1f, 1f)
@@ -280,6 +292,13 @@ fun PaperPlayer(
                 drawPath(frontShape, Color(0xFFFFFEFA))
                 clipPath(frontShape) {
                     drawRect(jerseyColor.copy(alpha = 1f))
+                    if (tones >= 2 && (jerseyPattern == JerseyPattern.PLAIN || jerseyPattern == JerseyPattern.TWO_TONE)) {
+                        drawRect(
+                            secondColor,
+                            topLeft = p(256f, 0f),
+                            size = androidx.compose.ui.geometry.Size(size.width / 2, size.height)
+                        )
+                    }
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(
@@ -291,17 +310,38 @@ fun PaperPlayer(
                             endY = p(0f, 408f).y
                         )
                     )
-                    if (facing == PlayerFacing.FRONT) {
-                        for (stripe in 0..4) {
-                            val x = 143f + stripe * 57f
-                            drawLine(
-                                Color.White.copy(alpha = .76f),
-                                p(x, 92f),
-                                p(x + 8f, 408f),
-                                strokeWidth =
-                                    7f * sx
-                            )
+                    val patternInk = if (tones >= 2) secondColor else Color.White.copy(alpha = .52f)
+                    when (jerseyPattern) {
+                        JerseyPattern.PLAIN, JerseyPattern.TWO_TONE -> Unit
+
+                        JerseyPattern.STRIPES -> repeat(4) { stripe ->
+                            val x = 162f + stripe * 62f
+                            drawLine(patternInk, p(x, 90f), p(x, 410f), strokeWidth = 20f * sx)
                         }
+
+                        JerseyPattern.HOOPS -> repeat(4) { hoop ->
+                            val y = 135f + hoop * 72f
+                            drawLine(patternInk, p(95f, y), p(420f, y), strokeWidth = 20f * sy)
+                        }
+
+                        JerseyPattern.CHEVRON -> {
+                            val chevron = Path().apply {
+                                moveTo(p(105f, 158f).x, p(105f, 158f).y)
+                                lineTo(p(256f, 235f).x, p(256f, 235f).y)
+                                lineTo(p(405f, 158f).x, p(405f, 158f).y)
+                            }
+                            drawPath(chevron, patternInk, style = Stroke(24f * sx))
+                        }
+                    }
+                    if (tones >= 3) {
+                        drawLine(thirdColor, p(110f, 370f), p(410f, 370f), 18f * sy)
+                        drawLine(thirdColor, p(145f, 98f), p(367f, 98f), 14f * sy)
+                    }
+                    if (tones >= 4) {
+                        drawLine(fourthColor, p(122f, 125f), p(122f, 390f), 16f * sx)
+                        drawLine(fourthColor, p(390f, 125f), p(390f, 390f), 16f * sx)
+                    }
+                    if (facing == PlayerFacing.FRONT) {
                         drawLine(
                             Color.White.copy(alpha = .45f),
                             p(178f, 116f),
@@ -337,13 +377,6 @@ fun PaperPlayer(
                             p(371f, 399f),
                             strokeWidth =
                                 5f * sx
-                        )
-                        drawLine(
-                            Color.White.copy(alpha = .55f),
-                            p(256f, 112f),
-                            p(256f, 398f),
-                            strokeWidth =
-                                4f * sx
                         )
                         drawLine(
                             Color.White.copy(alpha = .75f),
@@ -478,24 +511,24 @@ fun PaperPlayer(
                         scaleY = 1f - bend * .12f
                     }
             }
-            Text(
+            StandeePrint(
                 number,
                 Modifier.align(
                     Alignment.TopCenter
                 ).offset(y = 65.dp * labelScale).then(labelDeformation(65f)),
-                color = Color.White,
+                outlined = tones > 1,
                 fontSize = 25.sp * labelScale,
                 fontWeight = FontWeight.Black,
                 textAlign = TextAlign.Center,
                 lineHeight =
                     25.sp * labelScale
             )
-            Text(
+            StandeePrint(
                 name,
                 Modifier.align(
                     Alignment.TopCenter
                 ).offset(y = 38.dp * labelScale).then(labelDeformation(38f)),
-                color = Color.White,
+                outlined = tones > 1,
                 fontSize = 9.sp * labelScale,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing =
@@ -524,3 +557,29 @@ fun PaperPlayer(
 
 private val Ink = FoldballColor.Ink
 private val PlayerRed = FoldballColor.TeamRed
+
+/** White jersey printing with a fine ink outline, never an opaque patch. */
+@Composable
+private fun StandeePrint(
+    text: String,
+    modifier: Modifier,
+    fontSize: TextUnit,
+    fontWeight: FontWeight,
+    textAlign: TextAlign,
+    outlined: Boolean,
+    lineHeight: TextUnit = TextUnit.Unspecified,
+    letterSpacing: TextUnit = TextUnit.Unspecified
+) {
+    val style = TextStyle(
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        lineHeight = lineHeight,
+        letterSpacing = letterSpacing,
+        textAlign = textAlign
+    )
+    if (outlined) {
+        val outlineWidth = with(LocalDensity.current) { (fontSize.value * .08f).dp.toPx() }
+        Text(text, modifier, color = FoldballColor.Ink, style = style.copy(drawStyle = Stroke(outlineWidth)), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+    Text(text, modifier, color = Color.White, style = style, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+}

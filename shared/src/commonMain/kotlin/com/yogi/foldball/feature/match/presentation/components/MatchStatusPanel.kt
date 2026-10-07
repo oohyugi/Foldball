@@ -29,6 +29,7 @@ import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
+import com.yogi.foldball.gamekit.presentation.team.kitColor
 import kotlin.math.ceil
 
 @Composable
@@ -49,7 +50,7 @@ fun MatchStatusPanel(
     val activeTeam = snapshot.players.first { it.id == snapshot.focusedPlayerId }.team
     val defendingTeam = if (activeTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
     val shownTeam = if (snapshot.phase == GamePhase.DEFENDING) defendingTeam else activeTeam
-    val teamColor = if (shownTeam == GameTeam.RED) FoldballColor.TeamRed else FoldballColor.InkBlue
+    val teamColor = if (shownTeam == GameTeam.RED) teamConfiguration.kitColor(GameTeam.RED) else teamConfiguration.kitColor(GameTeam.BLUE)
     val timed = snapshot.phase == GamePhase.DEFENDING || snapshot.phase == GamePhase.AIMING
     val seconds = ceil(snapshot.phaseTimeRemaining).toInt()
     val title = when (snapshot.phase) {
@@ -214,7 +215,7 @@ fun MatchStatusPanel(
                         color = if (seconds <=
                             3
                         ) {
-                            FoldballColor.TeamRed
+                            teamConfiguration.kitColor(GameTeam.RED)
                         } else {
                             teamColor
                         }

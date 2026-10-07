@@ -40,11 +40,11 @@ import com.yogi.foldball.core.ui.theme.PaperButton
 import com.yogi.foldball.core.ui.theme.PaperChip
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.feature.balllab.presentation.screen.BallLabScreen
+import com.yogi.foldball.feature.club.presentation.screen.ClubRoute
 import com.yogi.foldball.feature.home.presentation.screen.HomeScreen
 import com.yogi.foldball.feature.match.presentation.screen.FullMatchScreen
 import com.yogi.foldball.feature.match.presentation.screen.MatchSandboxScreen
 import com.yogi.foldball.feature.playerlab.presentation.screen.PlayerLabScreen
-import com.yogi.foldball.feature.team.presentation.screen.TeamRoute
 import com.yogi.foldball.feature.welcome.presentation.screen.WelcomeRoute
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -86,7 +86,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                 AppRoute.Loading -> return@LaunchedEffect
                 AppRoute.Home -> "home"
                 AppRoute.Welcome -> "welcome"
-                AppRoute.Team -> "team"
+                AppRoute.Club -> "club"
                 AppRoute.Sandbox -> "sandbox"
                 AppRoute.Match -> "match"
             }
@@ -100,7 +100,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
         LaunchedEffect(appViewModel, navController) {
             appViewModel.destinations.collect { destination ->
                 when (destination) {
-                    AppRoute.Team -> navController.navigate("team") { launchSingleTop = true }
+                    AppRoute.Club -> navController.navigate("club") { launchSingleTop = true }
                     AppRoute.Welcome -> returnHome()
                     else -> Unit
                 }
@@ -118,14 +118,8 @@ private fun FoldballRoot(startAtHome: Boolean) {
                         composable("loading") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                                 Column(Modifier.padding(24.dp)) {
-                                    Text(
-                                        state.error ?: "Loading your team…",
-                                        style = FoldballType.Body,
-                                        color = FoldballColor.Ink
-                                    )
-                                    if (state.error !=
-                                        null
-                                    ) {
+                                    state.error?.let { error ->
+                                        Text(error, style = FoldballType.Body, color = FoldballColor.Paper)
                                         PaperButton("Retry", {
                                             appViewModel.onIntent(
                                                 AppIntent.RetryProfile
@@ -143,11 +137,8 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                     onBallStyleChange = {
                                         appViewModel.onIntent(AppIntent.BallStyleSelected(it))
                                     },
-                                    onEditClub = {
-                                        appViewModel.onIntent(AppIntent.EditTeam)
-                                    },
-                                    onTeamClick = {
-                                        appViewModel.onIntent(AppIntent.EditTeam)
+                                    onClubClick = {
+                                        appViewModel.onIntent(AppIntent.EditClub)
                                     },
                                     onBallClick = {
                                         openSandbox(SandboxTab.BALL)
@@ -186,7 +177,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                         composable("welcome") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                                 WelcomeRoute(onSaved = {
-                                    appViewModel.onIntent(AppIntent.TeamSaved(it))
+                                    appViewModel.onIntent(AppIntent.ClubSaved(it))
                                     navController.navigate("home") {
                                         popUpTo("welcome") { inclusive = true }
                                         launchSingleTop = true
@@ -194,11 +185,11 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                 })
                             }
                         }
-                        composable("team") {
+                        composable("club") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                                TeamRoute(
+                                ClubRoute(
                                     onSaved = {
-                                        appViewModel.onIntent(AppIntent.TeamSaved(it))
+                                        appViewModel.onIntent(AppIntent.ClubSaved(it))
                                         returnHome()
                                     },
                                     onCancel = { returnHome() }

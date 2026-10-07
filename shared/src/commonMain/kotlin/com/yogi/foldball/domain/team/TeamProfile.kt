@@ -1,14 +1,16 @@
 package com.yogi.foldball.domain.team
 
 object ClubBadges {
-    val ids: List<Int> = (1..16).toList()
+    val ids: List<Int> = (1..25).toList()
 }
 
 @ConsistentCopyVisibility
 data class TeamProfile private constructor(
     val name: String,
     val shortName: String,
-    val badgeId: Int
+    val badgeId: Int,
+    val jerseyPattern: JerseyPattern? = null,
+    val jerseyColorCount: Int = 1
 ) {
     init {
         require(name.isNotBlank() && name == name.trim() && name.length <= MAX_NAME_LENGTH)
@@ -17,18 +19,19 @@ data class TeamProfile private constructor(
                 shortName.all(Char::isLetterOrDigit)
         )
         require(badgeId in ClubBadges.ids)
+        require(jerseyColorCount in 1..4)
     }
 
-    fun toMatchIdentity() = TeamIdentity(name, shortName, badgeId)
+    fun toMatchIdentity() = TeamIdentity(name, shortName, badgeId, jerseyPattern, jerseyColorCount)
 
     companion object {
         const val MAX_NAME_LENGTH = 20
         const val MAX_SHORT_NAME_LENGTH = 4
 
-        fun create(name: String, badgeId: Int, shortName: String? = null): TeamProfile? {
+        fun create(name: String, badgeId: Int, shortName: String? = null, jerseyPattern: JerseyPattern? = null, jerseyColorCount: Int = if (jerseyPattern == JerseyPattern.TWO_TONE) 2 else 1): TeamProfile? {
             val cleanName = name.trim()
             if (cleanName.isEmpty() || cleanName.length > MAX_NAME_LENGTH ||
-                badgeId !in ClubBadges.ids
+                badgeId !in ClubBadges.ids || jerseyColorCount !in 1..4
             ) {
                 return null
             }
@@ -43,7 +46,7 @@ data class TeamProfile private constructor(
             ) {
                 return null
             }
-            return TeamProfile(cleanName, abbreviation, badgeId)
+            return TeamProfile(cleanName, abbreviation, badgeId, jerseyPattern, jerseyColorCount)
         }
     }
 }

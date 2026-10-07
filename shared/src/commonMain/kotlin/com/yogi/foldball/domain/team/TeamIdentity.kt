@@ -6,10 +6,13 @@ data class TeamIdentity(
     val jerseyLabel: String = name.filter(
         Char::isLetterOrDigit
     ).uppercase().take(MAX_JERSEY_LABEL_LENGTH),
-    val logoId: Int? = null
+    val logoId: Int? = null,
+    val jerseyPattern: JerseyPattern? = null,
+    val jerseyColorCount: Int = if (jerseyPattern == JerseyPattern.TWO_TONE) 2 else 1
 ) {
     init {
         require(logoId == null || logoId in ClubBadges.ids) { "Unknown club badge" }
+        require(jerseyColorCount in 1..4)
         require(name.isNotBlank()) { "Team name must not be blank" }
         require(jerseyLabel.isNotBlank() && jerseyLabel.length <= MAX_JERSEY_LABEL_LENGTH) {
             "Jersey label must contain 1–$MAX_JERSEY_LABEL_LENGTH characters"

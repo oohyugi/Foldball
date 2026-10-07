@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -43,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -254,10 +256,12 @@ fun PaperIconButton(
     icon: Painter,
     contentDescription: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     PressableSurface(
         onClick = onClick,
+        enabled = enabled,
         shape = FoldballShapes.Chip,
         modifier = modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
         contentDescription = contentDescription
@@ -338,10 +342,20 @@ fun CirclePickerItem(
 }
 
 @Composable
-fun TapeLabel(text: String, modifier: Modifier = Modifier, compact: Boolean = false) {
+fun TapeLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    backgroundColor: Color = FoldballColor.Tape,
+    contentColor: Color = readableContentColor(backgroundColor),
+    emphasized: Boolean = false,
+    outlined: Boolean = false
+) {
     Text(
         text.uppercase(),
-        style = if (compact) {
+        style = if (emphasized) {
+            FoldballType.Caption.copy(fontSize = 16.sp, letterSpacing = .5.sp)
+        } else if (compact) {
             FoldballType.Caption.copy(
                 fontSize = 11.sp,
                 letterSpacing = .5.sp
@@ -349,11 +363,13 @@ fun TapeLabel(text: String, modifier: Modifier = Modifier, compact: Boolean = fa
         } else {
             FoldballType.Caption
         },
-        color = FoldballColor.Ink,
+        color = contentColor,
         maxLines = 1,
         softWrap = false,
-        modifier = modifier.rotate(FoldballTilt.TapeLabel).background(FoldballColor.Tape)
-            .padding(horizontal = if (compact) 5.dp else 14.dp, vertical = 3.dp)
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        modifier = modifier.rotate(FoldballTilt.TapeLabel).background(backgroundColor)
+            .then(if (outlined) Modifier.border(1.dp, FoldballColor.Ink) else Modifier)
+            .padding(horizontal = if (compact) 5.dp else 14.dp, vertical = if (emphasized) 4.dp else 3.dp)
     )
 }
 
@@ -486,6 +502,7 @@ fun PaperDialog(
     dismissText: String? = "Back",
     danger: Boolean = false,
     stackedActions: Boolean = false,
+    confirmEnabled: Boolean = true,
     content: (@Composable () -> Unit)? = null
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
@@ -527,6 +544,7 @@ fun PaperDialog(
                             confirmText,
                             onConfirm,
                             Modifier.fillMaxWidth(),
+                            enabled = confirmEnabled,
                             style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary
                         )
                     }
@@ -544,6 +562,7 @@ fun PaperDialog(
                         PaperButton(
                             confirmText,
                             onConfirm,
+                            enabled = confirmEnabled,
                             style = if (danger) PaperButtonStyle.Danger else PaperButtonStyle.Primary
                         )
                     }
@@ -551,4 +570,59 @@ fun PaperDialog(
             }
         }
     }
+}
+
+/** Paper equipment card with a consistent art slot and text hierarchy. */
+@Composable
+fun DeskMenuCard(
+    title: String,
+    subtitle: String,
+    tilt: Float,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    art: @Composable BoxScope.() -> Unit
+) {
+    PressableSurface(
+        onClick = onClick,
+        shape = FoldballShapes.Card,
+        modifier = modifier.rotate(tilt),
+        color = FoldballColor.Paper,
+        contentDescription = "$title. $subtitle"
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(FoldballSpace.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(FoldballSpace.xs)
+        ) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 64.dp), contentAlignment = Alignment.Center, content = art)
+            Text(
+                title,
+                style = FoldballType.Label,
+                color = FoldballColor.Ink,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                minLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Text(
+                subtitle,
+                style = FoldballType.Caption,
+                color = FoldballColor.InkBlue,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                minLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** Pick the higher-contrast shared foreground for an opaque label surface. */
+fun readableContentColor(background: Color): Color {
+    fun contrast(foreground: Color): Float {
+        val first = foreground.luminance()
+        val second = background.luminance()
+        return (maxOf(first, second) + .05f) / (minOf(first, second) + .05f)
+    }
+    return if (contrast(FoldballColor.Paper) > contrast(FoldballColor.Ink)) FoldballColor.Paper else FoldballColor.Ink
 }

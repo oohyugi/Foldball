@@ -9,7 +9,8 @@ import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.Vector2
-import com.yogi.foldball.domain.team.withRandomAiOpponent
+import com.yogi.foldball.domain.team.withAiOpponent
+import com.yogi.foldball.domain.team.withLocalOpponentBadge
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,11 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
     private var arena: MatchIntent.ConfigureArena? = null
     private var game: GameEngine? = null
     private var bot = newBot()
+    private val matchTeams = when {
+        !options.fullMatch -> options.teams
+        options.playAgainstBot -> options.teams.withAiOpponent(options.style)
+        else -> options.teams.withLocalOpponentBadge()
+    }
     private val state = MutableStateFlow(newState())
     val uiState = state.asStateFlow()
     val snapshot get() = requireNotNull(state.value.snapshot)
@@ -197,7 +203,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
     }
     private fun newBot() = BotPlanner(options.difficulty, style = options.style)
     private fun newState(sessionId: Int = 0) = MatchUiState(
-        teams = if (options.fullMatch) options.teams.withRandomAiOpponent() else options.teams,
+        teams = matchTeams,
         openingKickoffTeam = if (options.fullMatch) null else GameTeam.RED,
         dentingEnabled = options.standeeDamage,
         sessionId = sessionId,

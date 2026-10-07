@@ -36,6 +36,7 @@ import com.yogi.foldball.core.ui.theme.FoldballType
 import com.yogi.foldball.core.ui.theme.PaperCard
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
+import com.yogi.foldball.gamekit.presentation.team.kitColor
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -65,9 +66,9 @@ fun GoalCelebrationOverlay(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 val teamColor = if (scoringTeam == GameTeam.RED) {
-                    FoldballColor.TeamRed
+                    teamConfiguration.kitColor(GameTeam.RED)
                 } else {
-                    FoldballColor.InkBlue
+                    teamConfiguration.kitColor(GameTeam.BLUE)
                 }
                 Canvas(Modifier.size(216.dp)) {
                     val center = Offset(size.width / 2f, size.height / 2f)

@@ -28,7 +28,7 @@ object FoldballColor {
     val Tape = Color(0xFFF4D34A)
     val Grass = Color(0xFF3F8F43)
     val Cardboard = Color(0xFFC99A62)
-    val InkMuted = Color(0xFF777A80)
+    val InkMuted = Color(0xFF62656B)
     val FieldPaper = Color(0xFFE8E1D4)
     val FieldLine = Color(0xFFC7BFAF)
     val FieldHighlight = Color(0xFFF1EBE0)

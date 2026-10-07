@@ -22,8 +22,10 @@ import com.yogi.foldball.core.ui.theme.FoldballTilt
 import com.yogi.foldball.core.ui.theme.FoldballType
 import com.yogi.foldball.core.ui.theme.PaperCard
 import com.yogi.foldball.core.ui.theme.PaperIconButton
+import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.gamekit.presentation.team.ClubLogo
+import com.yogi.foldball.gamekit.presentation.team.kitColor
 import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.icon_pause
 import foldball.shared.generated.resources.icon_play
@@ -63,13 +65,13 @@ fun MatchScoreboard(
                 ) {
                     ClubLogo(
                         teamConfiguration.red.logoId,
-                        "${teamConfiguration.red.name} badge",
+                        "${teamConfiguration.red.name} club badge",
                         Modifier.size(32.dp)
                     )
                     Text(
                         teamConfiguration.red.jerseyLabel,
                         style = FoldballType.Label.copy(fontSize = 14.sp),
-                        color = FoldballColor.TeamRed,
+                        color = teamConfiguration.kitColor(GameTeam.RED),
                         maxLines = 1
                     )
                 }
@@ -97,12 +99,12 @@ fun MatchScoreboard(
                     Text(
                         teamConfiguration.blue.jerseyLabel,
                         style = FoldballType.Label.copy(fontSize = 14.sp),
-                        color = FoldballColor.InkBlue,
+                        color = teamConfiguration.kitColor(GameTeam.BLUE),
                         maxLines = 1
                     )
                     ClubLogo(
                         teamConfiguration.blue.logoId,
-                        "${teamConfiguration.blue.name} badge",
+                        "${teamConfiguration.blue.name} club badge",
                         Modifier.size(32.dp)
                     )
                 }

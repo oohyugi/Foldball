@@ -57,16 +57,41 @@ class MatchViewModelTest {
 
     @Test fun rematchResetsClockTossAndEngineWithoutReusingOpponentsBadge() {
         val vm = match()
+        val originalTeams = vm.uiState.value.teams
         vm.onIntent(MatchIntent.KickoffSelected(GameTeam.RED))
         vm.advanceFrame(.1f)
         vm.onIntent(MatchIntent.SetPaused(true))
         vm.onIntent(MatchIntent.Rematch)
+        assertEquals(originalTeams, vm.uiState.value.teams)
         assertEquals(1, vm.uiState.value.sessionId)
         assertFalse(vm.uiState.value.paused)
         assertEquals(0f, vm.uiState.value.elapsedSeconds)
         assertEquals(null, vm.uiState.value.openingKickoffTeam)
         assertEquals(0, vm.snapshot.redScore)
         assertNotEquals(vm.uiState.value.teams.red.logoId, vm.uiState.value.teams.blue.logoId)
+    }
+
+    @Test fun aiRematchPreservesIdentityAcrossAllStylesAndDifficulties() {
+        for (style in BotStyle.entries) {
+            for (difficulty in BotDifficulty.entries) {
+                val vm = MatchViewModel(
+                    MatchOptions(
+                        true,
+                        true,
+                        difficulty,
+                        style,
+                        true,
+                        MatchTimingConfig(),
+                        MatchTeamConfiguration()
+                    )
+                )
+                val teams = vm.uiState.value.teams
+                repeat(3) {
+                    vm.onIntent(MatchIntent.Rematch)
+                    assertEquals(teams, vm.uiState.value.teams)
+                }
+            }
+        }
     }
 
     @Test fun configuredDurationEndsMatchAndSandboxDoesNotConsumeMatchTime() {

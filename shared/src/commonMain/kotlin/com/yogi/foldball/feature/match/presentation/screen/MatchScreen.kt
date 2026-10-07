@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.draw.shadow
@@ -39,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,7 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import com.yogi.foldball.core.audio.CountdownCue
 import com.yogi.foldball.core.audio.LocalGameAudio
 import com.yogi.foldball.core.audio.SoundDispatcher
+import com.yogi.foldball.core.audio.TurnCue
 import com.yogi.foldball.core.ui.theme.FoldballColor
 import com.yogi.foldball.core.ui.theme.FoldballShapes
 import com.yogi.foldball.core.ui.theme.FoldballTilt
@@ -58,7 +61,6 @@ import com.yogi.foldball.core.ui.theme.FoldballType
 import com.yogi.foldball.core.ui.theme.PaperButton
 import com.yogi.foldball.core.ui.theme.PaperButtonStyle
 import com.yogi.foldball.core.ui.theme.PaperCard
-import com.yogi.foldball.core.ui.theme.PaperChip
 import com.yogi.foldball.core.ui.theme.PaperDialog
 import com.yogi.foldball.core.ui.theme.PaperToggle
 import com.yogi.foldball.core.ui.theme.TapeLabel
@@ -73,11 +75,13 @@ import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
 import com.yogi.foldball.domain.team.BallStyle
+import com.yogi.foldball.domain.team.JerseyPattern
 import com.yogi.foldball.feature.match.presentation.components.GoalCelebrationOverlay
 import com.yogi.foldball.feature.match.presentation.components.MatchScoreboard
 import com.yogi.foldball.feature.match.presentation.components.MatchStatusPanel
 import com.yogi.foldball.feature.match.presentation.components.OpeningTossOverlay
 import com.yogi.foldball.feature.match.presentation.components.PowerTimingMeter
+import com.yogi.foldball.feature.match.presentation.components.TurnTimer
 import com.yogi.foldball.feature.match.presentation.viewmodel.MatchIntent
 import com.yogi.foldball.feature.match.presentation.viewmodel.MatchOptions
 import com.yogi.foldball.feature.match.presentation.viewmodel.MatchViewModel
@@ -89,6 +93,8 @@ import com.yogi.foldball.gamekit.presentation.player.PlayerFacing
 import com.yogi.foldball.gamekit.presentation.player.PlayerFocusState
 import com.yogi.foldball.gamekit.presentation.player.StandeeConditionBar
 import com.yogi.foldball.gamekit.presentation.player.rememberPlayerMotionState
+import com.yogi.foldball.gamekit.presentation.team.ClubKit
+import com.yogi.foldball.gamekit.presentation.team.kitColor
 import foldball.shared.generated.resources.Res
 import foldball.shared.generated.resources.home_desk_classroom
 import kotlin.math.PI
@@ -172,7 +178,6 @@ private fun MatchExperienceScreen(
     val isPaused = matchState.paused
     val matchKey = matchState.sessionId
     val teamConfiguration = matchState.teams
-    var lastWhistledKickoffScore by remember(matchKey) { mutableStateOf(-1) }
     val openingKickoffTeam = matchState.openingKickoffTeam
     val redScore = matchState.snapshot?.redScore ?: 0
     val blueScore = matchState.snapshot?.blueScore ?: 0
@@ -259,6 +264,7 @@ private fun MatchExperienceScreen(
             val state = matchState.snapshot ?: return@BoxWithConstraints
 
             val countdownCue = remember(viewModel, matchKey) { CountdownCue() }
+            val turnCue = remember(viewModel, matchKey) { TurnCue() }
             val soundDispatcher = remember(viewModel, matchKey) { SoundDispatcher(state.soundEvents) }
             var commentary by remember(viewModel, matchKey) { mutableStateOf<String?>(null) }
             var previousCommentEvents by remember(viewModel, matchKey) {
@@ -295,14 +301,25 @@ private fun MatchExperienceScreen(
                 }
             }
 
-            LaunchedEffect(viewModel, matchKey, state.phase, openingKickoffTeam) {
-                val score = state.redScore + state.blueScore
-                if (fullMatch && openingKickoffTeam != null && state.phase == GamePhase.DEFENDING &&
-                    score != lastWhistledKickoffScore
-                ) {
-                    lastWhistledKickoffScore = score
-                    audio?.play("kickoff", .5f)
-                }
+            LaunchedEffect(
+                viewModel,
+                matchKey,
+                state.phase,
+                state.focusedPlayerId,
+                openingKickoffTeam,
+                isPaused,
+                audio?.enabled,
+                audio?.foreground
+            ) {
+                val possession = state.players.first { it.id == state.focusedPlayerId }.team
+                val cue = turnCue.update(
+                    state.phase,
+                    possession,
+                    state.focusedPlayerId,
+                    ready = fullMatch && openingKickoffTeam != null,
+                    active = !isPaused && audio?.enabled == true && audio.foreground
+                )
+                cue?.let { audio?.play(it, .3f) }
             }
 
             LaunchedEffect(viewModel, matchKey, state.phase) {
@@ -452,7 +469,7 @@ private fun MatchExperienceScreen(
                                             audio.foreground
                                     )
                                 ) {
-                                    audio?.play("timeout", .35f)
+                                    audio?.play("countdown_tick", .25f)
                                 }
                             }
                         }
@@ -612,7 +629,7 @@ private fun MatchExperienceScreen(
                     possessionTeam
                 }
                 val localTwoPlayers = fullMatch && !playAgainstBot
-                val turnName = teamConfiguration.forTeam(turnTeam).name
+                val turnName = teamConfiguration.forTeam(turnTeam).jerseyLabel
                 val turnLabel = when {
                     localTwoPlayers && state.phase == GamePhase.DEFENDING ->
                         "$turnName TURN · DEFEND" +
@@ -624,41 +641,50 @@ private fun MatchExperienceScreen(
 
                     else -> when (state.phase) {
                         GamePhase.DEFENDING -> if (state.openingKickoffPending) {
-                            "FORMATION · ${teamConfiguration.forTeam(turnTeam).name} · OWN HALF"
+                            "FORMATION · ${teamConfiguration.forTeam(turnTeam).jerseyLabel} · OWN HALF"
                         } else {
                             "SET FORMATION · ${teamConfiguration.forTeam(
                                 turnTeam
-                            ).name} · TAP PLAYER"
+                            ).jerseyLabel} · TAP PLAYER"
                         }
 
-                        GamePhase.AIMING -> "KICK · ${teamConfiguration.forTeam(turnTeam).name}"
+                        GamePhase.AIMING -> "KICK · ${teamConfiguration.forTeam(turnTeam).jerseyLabel}"
 
                         GamePhase.KICKER_APPROACH -> "KICK NEXT · ${teamConfiguration.forTeam(
                             turnTeam
-                        ).name}"
+                        ).jerseyLabel}"
 
                         GamePhase.BALL_MOVING -> "SHOT IN PLAY · ${teamConfiguration.forTeam(
                             possessionTeam
-                        ).name}"
+                        ).jerseyLabel}"
 
                         GamePhase.TURNOVER_RETREAT -> "TURNOVER · ${teamConfiguration.forTeam(
                             possessionTeam
-                        ).name}"
+                        ).jerseyLabel}"
 
                         GamePhase.GOAL -> "GOAL · ${state.lastScoringTeam?.let {
-                            teamConfiguration.forTeam(it).name
+                            teamConfiguration.forTeam(it).jerseyLabel
                         }.orEmpty()}"
 
                         GamePhase.MATCH_OVER -> "MATCH COMPLETE"
                     }
                 }
-                if (!(fullMatch && openingKickoffTeam == null)) {
-                    TapeLabel(
-                        commentary ?: turnLabel,
-                        Modifier.align(Alignment.CenterHorizontally)
-                            .semantics { liveRegion = LiveRegionMode.Polite }
-                    )
-                }
+                val statusTeam = if (state.phase == GamePhase.GOAL) state.lastScoringTeam ?: turnTeam else turnTeam
+                val tossing = fullMatch && openingKickoffTeam == null
+                TapeLabel(
+                    commentary ?: turnLabel,
+                    emphasized = true,
+                    outlined = true,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                        .then(
+                            if (tossing) {
+                                Modifier.alpha(0f).clearAndSetSemantics { }
+                            } else {
+                                Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                            }
+                        ),
+                    backgroundColor = if (state.phase == GamePhase.MATCH_OVER) FoldballColor.Tape else teamConfiguration.kitColor(statusTeam)
+                )
                 ClassroomStadium(
                     fieldWidthDp = fieldWidth,
                     fieldHeightDp = fieldHeight,
@@ -670,6 +696,7 @@ private fun MatchExperienceScreen(
                 ) {
                     if (fullMatch && openingKickoffTeam == null) {
                         OpeningTossOverlay(
+                            ballStyle = ballStyle,
                             teamConfiguration = teamConfiguration,
                             onWinner = { viewModel.onIntent(MatchIntent.KickoffSelected(it)) }
                         )
@@ -790,9 +817,9 @@ private fun MatchExperienceScreen(
                                         val teamColor = if (turnTeam ==
                                             GameTeam.RED
                                         ) {
-                                            FoldballColor.TeamRed
+                                            teamConfiguration.kitColor(GameTeam.RED)
                                         } else {
-                                            FoldballColor.InkBlue
+                                            teamConfiguration.kitColor(GameTeam.BLUE)
                                         }
                                         if (selectedMoveId == null && zone in teamReachableZones) {
                                             drawRect(
@@ -819,9 +846,9 @@ private fun MatchExperienceScreen(
                                                         if (player.team ==
                                                             GameTeam.RED
                                                         ) {
-                                                            FoldballColor.TeamRed
+                                                            teamConfiguration.kitColor(GameTeam.RED)
                                                         } else {
-                                                            FoldballColor.InkBlue
+                                                            teamConfiguration.kitColor(GameTeam.BLUE)
                                                         }
                                                     }?.copy(alpha = .12f)
                                                         ?: FoldballColor.BallHighlight.copy(
@@ -1061,12 +1088,17 @@ private fun MatchExperienceScreen(
                                 impactDirectionX = player.impactDirectionX,
                                 impactDirectionY = player.impactDirectionY,
                                 impactStrength = player.impactStrength,
+                                jerseyColorCount = teamConfiguration.forTeam(player.team).jerseyColorCount,
+                                jerseyPalette = ClubKit.palette(teamConfiguration.forTeam(player.team).logoId),
+                                jerseyPattern = teamConfiguration.forTeam(player.team).let {
+                                    it.jerseyPattern ?: JerseyPattern.PLAIN
+                                },
                                 jerseyColor = if (player.team ==
                                     GameTeam.RED
                                 ) {
-                                    FoldballColor.TeamRed
+                                    teamConfiguration.kitColor(GameTeam.RED)
                                 } else {
-                                    FoldballColor.InkBlue
+                                    teamConfiguration.kitColor(GameTeam.BLUE)
                                 },
                                 number = when (player.id.substringAfter("-")) {
                                     "center" -> "1"
@@ -1316,24 +1348,17 @@ private fun MatchExperienceScreen(
                     }
                 }
 
-                if (!(fullMatch && openingKickoffTeam == null)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (tossing) {
+                    Spacer(Modifier.fillMaxWidth().height(56.dp))
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().then(if (fullMatch) Modifier.height(56.dp) else Modifier),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         if (fullMatch &&
                             (state.phase == GamePhase.DEFENDING || state.phase == GamePhase.AIMING)
                         ) {
-                            Text(
-                                "${phaseSeconds}s",
-                                modifier = Modifier.width(42.dp),
-                                style = FoldballType.Label,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = if (phaseSeconds <= 3 ||
-                                    turnTeam == GameTeam.RED
-                                ) {
-                                    FoldballColor.TeamRed
-                                } else {
-                                    FoldballColor.InkBlue
-                                }
-                            )
+                            TurnTimer(phaseSeconds, teamConfiguration.forTeam(turnTeam).jerseyLabel)
                         }
                         Box(Modifier.weight(1f)) {
                             MatchStatusPanel(
@@ -1397,29 +1422,6 @@ private fun MatchExperienceScreen(
                                 showMatchMenu = false
                                 showExitConfirmation = true
                             }, Modifier.fillMaxWidth(), style = PaperButtonStyle.Danger)
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                PaperChip("Move", {
-                                    viewModel.onIntent(MatchIntent.SetPaused(false))
-                                    showMatchMenu =
-                                        false
-                                    onOpenTools("movement")
-                                }, "Open Movement Lab", Modifier.weight(1f))
-                                PaperChip("Ball", {
-                                    viewModel.onIntent(MatchIntent.SetPaused(false))
-                                    showMatchMenu =
-                                        false
-                                    onOpenTools("ball")
-                                }, "Open Ball Lab", Modifier.weight(1f))
-                                PaperChip("Player", {
-                                    viewModel.onIntent(MatchIntent.SetPaused(false))
-                                    showMatchMenu =
-                                        false
-                                    onOpenTools("player")
-                                }, "Open Player Lab", Modifier.weight(1f))
-                            }
                         }
                     }
                 }
@@ -1475,13 +1477,13 @@ private fun MatchExperienceScreen(
                                 Text(
                                     teamConfiguration.red.name,
                                     style = FoldballType.Caption,
-                                    color = FoldballColor.TeamRed,
+                                    color = teamConfiguration.kitColor(GameTeam.RED),
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                                 Text(
                                     state.redScore.toString(),
                                     style = FoldballType.LargeTitle,
-                                    color = FoldballColor.TeamRed
+                                    color = teamConfiguration.kitColor(GameTeam.RED)
                                 )
                             }
                             Text("–", style = FoldballType.Title, color = FoldballColor.Ink)
@@ -1492,13 +1494,13 @@ private fun MatchExperienceScreen(
                                 Text(
                                     teamConfiguration.blue.name,
                                     style = FoldballType.Caption,
-                                    color = FoldballColor.InkBlue,
+                                    color = teamConfiguration.kitColor(GameTeam.BLUE),
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
                                 Text(
                                     state.blueScore.toString(),
                                     style = FoldballType.LargeTitle,
-                                    color = FoldballColor.InkBlue
+                                    color = teamConfiguration.kitColor(GameTeam.BLUE)
                                 )
                             }
                         }
