@@ -30,6 +30,29 @@ class ShotLoftTest {
         return engine
     }
 
+    @Test fun previewInclinationMatchesActualLaunchForBothTeams() {
+        for (team in GameTeam.entries) {
+            var previousLoft = 0f
+            for (power in listOf(.1f, .3f, .5f, .7f, .9f, 1f)) {
+                val ball = shot(team, power).snapshot.ball
+                val inclination = kotlin.math.atan2(ball.verticalVelocity, ball.velocity.length())
+                val fullInclination = kotlin.math.atan2(ShotLaunch.verticalSpeed(1f), ShotLaunch.speed(1f))
+                assertEquals(inclination / fullInclination, ShotLaunch.loft(power), .0001f)
+                assertTrue(ShotLaunch.loft(power) >= previousLoft)
+                previousLoft = ShotLaunch.loft(power)
+            }
+        }
+    }
+
+    @Test fun defaultLaunchRetainsOriginalSpeedWithOptionalPracticeLobTradeoff() {
+        assertEquals(540f, ShotLaunch.speed(.5f), .001f)
+        assertEquals(724.8f, ShotLaunch.speed(.6f), .001f)
+        assertEquals(1800f, ShotLaunch.speed(1f), .001f)
+        assertEquals(3200f, ShotLaunch.verticalSpeed(1f), .001f)
+        assertEquals(1170f, ShotLaunch.speed(1f, lobForwardRetention = .65f), .001f)
+        assertEquals(ShotLaunch.speed(1f) * .7f, ShotLaunch.speed(1f, .7f), .001f)
+    }
+
     @Test fun fullPowerCloseShotCrossesAboveGoalForBothTeams() {
         for (team in GameTeam.entries) {
             val engine = shot(team, 1f)

@@ -97,7 +97,7 @@ fun PaperPlayer(
                 408f + (408f - y) * .30f
             )
             val shadow = Path().apply {
-                if (facing == PlayerFacing.FRONT) {
+                run {
                     moveTo(shadowPoint(92f, 392f).x, shadowPoint(92f, 392f).y)
                     lineTo(shadowPoint(170f, 92f).x, shadowPoint(170f, 92f).y)
                     lineTo(shadowPoint(352f, 92f).x, shadowPoint(352f, 92f).y)
@@ -109,11 +109,6 @@ fun PaperPlayer(
                     lineTo(shadowPoint(352f, 90f).x, shadowPoint(352f, 90f).y)
                     lineTo(shadowPoint(390f, 408f).x, shadowPoint(390f, 408f).y)
                     lineTo(shadowPoint(122f, 408f).x, shadowPoint(122f, 408f).y)
-                } else {
-                    moveTo(shadowPoint(150f, 110f).x, shadowPoint(150f, 110f).y)
-                    lineTo(shadowPoint(362f, 110f).x, shadowPoint(362f, 110f).y)
-                    lineTo(shadowPoint(410f, 408f).x, shadowPoint(410f, 408f).y)
-                    lineTo(shadowPoint(102f, 408f).x, shadowPoint(102f, 408f).y)
                 }
                 close()
             }
@@ -240,24 +235,17 @@ fun PaperPlayer(
                 val topFold = Path().apply {
                     moveTo(p(190f, 61f).x, p(190f, 61f).y)
                     lineTo(p(322f, 61f).x, p(322f, 61f).y)
-                    if (facing == PlayerFacing.FRONT) {
-                        lineTo(p(352f, 90f).x, p(352f, 90f).y)
-                        lineTo(p(160f, 90f).x, p(160f, 90f).y)
-                    } else {
-                        // The back panel begins lower than the front panel. Extend
-                        // its fold to that edge so the top does not look detached.
-                        // Extend behind the back panel slightly; the panel is drawn
-                        // over this fold, preventing an antialiased hairline gap.
-                        lineTo(p(362f, 116f).x, p(362f, 116f).y)
-                        lineTo(p(150f, 116f).x, p(150f, 116f).y)
-                    }
+                    lineTo(p(352f, 96f).x, p(352f, 96f).y)
+                    lineTo(p(160f, 96f).x, p(160f, 96f).y)
                     close()
                 }
                 val backPanel = Path().apply {
-                    moveTo(p(150f, 110f).x, p(150f, 110f).y)
-                    lineTo(p(362f, 110f).x, p(362f, 110f).y)
-                    lineTo(p(410f, 408f).x, p(410f, 408f).y)
-                    lineTo(p(102f, 408f).x, p(102f, 408f).y)
+                    moveTo(p(160f, 90f).x, p(160f, 90f).y)
+                    lineTo(p(352f, 90f).x, p(352f, 90f).y)
+                    lineTo(p(420f, 392f).x, p(420f, 392f).y)
+                    lineTo(p(390f, 408f).x, p(390f, 408f).y)
+                    lineTo(p(122f, 408f).x, p(122f, 408f).y)
+                    lineTo(p(92f, 392f).x, p(92f, 392f).y)
                     close()
                 }
                 val frontShape = if (facing == PlayerFacing.FRONT) front else backPanel
@@ -276,7 +264,7 @@ fun PaperPlayer(
                     }
                 )
                 drawPath(topFold, Ink.copy(alpha = .85f), style = Stroke(width = 3.5f * sx))
-                if (facing == PlayerFacing.FRONT) {
+                run {
                     drawPath(back, Color(0xFFE1E0DC))
                     drawPath(back, Ink.copy(alpha = .8f), style = Stroke(width = 4f * sx))
                 }
@@ -389,8 +377,8 @@ fun PaperPlayer(
                 }
                 drawPath(frontShape, FoldballColor.PaperEdge, style = Stroke(width = 5f * sx))
                 drawPath(frontShape, Ink.copy(alpha = .85f), style = Stroke(width = 2.8f * sx))
-                val edgeLeft = if (facing == PlayerFacing.FRONT) 122f else 102f
-                val edgeRight = if (facing == PlayerFacing.FRONT) 390f else 410f
+                val edgeLeft = 122f
+                val edgeRight = 390f
                 // Small cut-edge irregularities stay attached to the same warped sheet.
                 drawLine(
                     FoldballColor.Paper,
@@ -479,9 +467,9 @@ fun PaperPlayer(
                     }
                     drawPath(nape, Ink.copy(alpha = .38f * dentAmount))
                 }
-                val foldEdgeY = if (facing == PlayerFacing.FRONT) 90f else 110f
-                val foldEdgeLeft = if (facing == PlayerFacing.FRONT) 160f else 150f
-                val foldEdgeRight = if (facing == PlayerFacing.FRONT) 352f else 362f
+                val foldEdgeY = 90f
+                val foldEdgeLeft = 160f
+                val foldEdgeRight = 352f
                 drawLine(
                     Color(0xFF77736F),
                     p(foldEdgeLeft, foldEdgeY),

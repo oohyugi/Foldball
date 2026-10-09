@@ -10,5 +10,5 @@ import org.koin.dsl.module
 
 val appModule = module {
     includes(dataModule, clubModule, welcomeModule, matchModule)
-    viewModel { parameters -> AppViewModel(get(), parameters.get()) }
+    viewModel { parameters -> AppViewModel(get(), parameters.get(), get()) }
 }

@@ -90,6 +90,8 @@ data class GameSnapshot(
     val winner: GameTeam?,
     val openingKickoffPending: Boolean,
     val lastShotPower: Float,
+    val formationTeam: GameTeam? = null,
+    val attackerPositioning: Boolean = false,
     val soundEvents: SoundEvents = SoundEvents()
 )
 
@@ -124,9 +126,16 @@ class GameEngine(
     initialKickoffTeam: GameTeam = GameTeam.RED,
     private val dentingEnabled: Boolean = false,
     private val format: MatchFormat? = null,
-    private val defensiveBlockWinsPossession: Boolean = false
+    private val defensiveBlockWinsPossession: Boolean = false,
+    private val playMode: MatchPlayMode = MatchPlayMode.CLASSIC,
+    private val practiceOpponents: Int? = null,
+    private val physicsTuning: PhysicsTuning = PhysicsTuning()
 ) {
     private var matchTimeExpired = false
+    private var attackingTeam = initialKickoffTeam
+    private var secondHalfPending = false
+    private var attackDefendHalf = 1
+    private var attackerPositioning = false
     private val ballRadius = 10f
     private val playerRadius = 25f
     private val standeeCollisionHeight = 52f
@@ -149,14 +158,14 @@ class GameEngine(
     private val crossSectionAreaSquareMeters = PI.toFloat() * ballRadiusMeters * ballRadiusMeters
 
     // Creased paper still rebounds, but it loses more energy than a hard ball.
-    private val playerBounceRestitution = .50f
+    private val playerBounceRestitution = physicsTuning.playerBounce
     private val playerBounceTangentialRetention = .78f
     private val playerMassRatio = standeeMassKg / ballMassKg
     private val playerContactCooldown = .12f
     private val playerImpactHopFraction = .45f
     private val maxPlayerImpactHopSpeed = 280f
-    private val groundBounceRestitution = .18f
-    private val wallBounceRestitution = .45f
+    private val groundBounceRestitution = physicsTuning.groundBounce
+    private val wallBounceRestitution = physicsTuning.wallBounce
     private val wallTangentialRetention = .72f
     private val kickerVisualGap = 1f
     private val playerCollisionDistance = ballRadius + playerRadius + playerCollisionOverlap
@@ -174,6 +183,14 @@ class GameEngine(
     private var players = createRoster()
 
     private fun createRoster(): List<MatchPlayer> {
+        practiceOpponents?.let { count ->
+            require(count in 0..5)
+            val defenderZones = listOf(17, 13, 15, 14, 11)
+            return listOf(player("red-striker", GameTeam.RED, 8)) +
+                defenderZones.take(count).mapIndexed { index, zone ->
+                    player("blue-practice-$index", GameTeam.BLUE, zone)
+                }
+        }
         val zones = when (format) {
             null -> return listOf(
                 player("red-left", GameTeam.RED, 4, offsetTowardAttackRows = .2f),
@@ -276,6 +293,11 @@ class GameEngine(
             player.copy(position = kickoffHome, home = kickoffHome)
         }
         moveFocusedBehindBall()
+        if (practiceOpponents != null) {
+            phase = GamePhase.AIMING
+            phaseTimeRemaining = timing.attackSeconds.toFloat()
+            openingKickoffPending = false
+        }
     }
 
     /** Independent copy for bot planning; immutable player/ball values may be shared. */
@@ -288,9 +310,16 @@ class GameEngine(
             kickoffTeam,
             dentingEnabled,
             format,
-            defensiveBlockWinsPossession
+            defensiveBlockWinsPossession,
+            playMode,
+            practiceOpponents,
+            physicsTuning
         )
         copy.matchTimeExpired = matchTimeExpired
+        copy.attackingTeam = attackingTeam
+        copy.secondHalfPending = secondHalfPending
+        copy.attackDefendHalf = attackDefendHalf
+        copy.attackerPositioning = attackerPositioning
         copy.players = players
         copy.ball = ball
         copy.phase = phase
@@ -331,9 +360,27 @@ class GameEngine(
         return copy
     }
 
+    val standeeBallContactDistance: Float get() = playerCollisionDistance
     val ballWallContactX: Float get() = wallInset + ballRadius
     val fieldWidth: Float get() = width
     val fieldHeight: Float get() = height
+    val currentHalf: Int get() = attackDefendHalf
+
+    /** Complete the current shot before swapping the fixed attacking side. */
+    fun requestSecondHalf() {
+        if (playMode != MatchPlayMode.ATTACK_DEFEND || attackDefendHalf != 1) return
+        secondHalfPending = true
+        if (phase != GamePhase.BALL_MOVING && phase != GamePhase.GOAL) startSecondHalf()
+    }
+
+    private fun startSecondHalf() {
+        if (!secondHalfPending || matchTimeExpired) return
+        secondHalfPending = false
+        attackDefendHalf = 2
+        attackingTeam = if (attackingTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+        kickoffTeam = attackingTeam
+        beginKickoff(attackingTeam)
+    }
 
     fun setAimAngle(value: Float) {
         if (phase == GamePhase.AIMING) {
@@ -345,12 +392,11 @@ class GameEngine(
     fun movePlayerToZone(id: String, zone: Int): Boolean {
         if (!isAdjacentZoneForPlayer(id, zone)) return false
         val destination = legalPlayerPositionInZone(id, zone) ?: return false
-        val before = defensiveMovesUsed
         val origin = players.first { it.id == id }.position
         beginPlayerMove(id)
         moveInactivePlayer(id, destination - origin)
         endPlayerMove(id)
-        return defensiveMovesUsed > before
+        return players.first { it.id == id }.position != origin
     }
 
     val snapshot: GameSnapshot
@@ -374,6 +420,8 @@ class GameEngine(
             winner = winner,
             openingKickoffPending = openingKickoffPending,
             lastShotPower = lastShotPower,
+            formationTeam = if (phase == GamePhase.DEFENDING) formationTeam() else null,
+            attackerPositioning = attackerPositioning,
             soundEvents = soundEvents
         )
 
@@ -388,9 +436,13 @@ class GameEngine(
     }
 
     fun moveInactivePlayer(id: String, delta: Vector2) {
-        if (phase != GamePhase.DEFENDING || playerDragId != id) return
+        if ((phase != GamePhase.DEFENDING && !(phase == GamePhase.AIMING && (attackerPositioning || practiceOpponents != null))) ||
+            playerDragId != id
+        ) {
+            return
+        }
         val player = players.firstOrNull { it.id == id } ?: return
-        if (player.team == focusedPlayer().team) return
+        if (practiceOpponents == null && player.team != formationTeam()) return
         val blockedTravel = playerDragStart + playerDragDelta - player.position
         if (blockedTravel.x * delta.x + blockedTravel.y * delta.y < 0f) {
             playerDragDelta = player.position - playerDragStart
@@ -406,6 +458,13 @@ class GameEngine(
             safe = candidate
         }
         if (safe != player.position) {
+            if (practiceOpponents != null && id == focusedPlayerId) {
+                val movedBall = ball.position + (safe - player.position)
+                if (movedBall.x !in (wallInset + ballRadius)..(width - wallInset - ballRadius) ||
+                    movedBall.y !in (wallInset + ballRadius)..(height - wallInset - ballRadius)) return
+                if (players.any { it.id != id && (it.position - movedBall).length() < playerCollisionDistance }) return
+                ball = ball.copy(position = movedBall)
+            }
             players = players.map {
                 if (it.id ==
                     id
@@ -429,22 +488,27 @@ class GameEngine(
             playerDragStartState = null
             playerDragDelta = Vector2(0f, 0f)
             playerDragStartZone = null
-            if (format != null && phase == GamePhase.DEFENDING &&
-                defensiveMovesUsed >= maxDefensiveMoves
-            ) {
-                finishDefense()
-            }
+
         }
     }
 
     val defensiveMovesUsed: Int get() = defensiveMoveHistory.size
     val defensiveMoveLimit: Int get() = maxDefensiveMoves
 
-    fun canUndoPlayerMove(): Boolean = phase == GamePhase.DEFENDING && playerDragId == null && defensiveMoveHistory.isNotEmpty()
+    fun canUndoPlayerMove(): Boolean {
+        val positioningOpen = phase == GamePhase.DEFENDING ||
+            (phase == GamePhase.AIMING && (attackerPositioning || practiceOpponents != null))
+        return positioningOpen && phaseTimeRemaining > 0f && playerDragId == null &&
+            power <= .01f && defensiveMoveHistory.isNotEmpty()
+    }
 
     fun undoLastPlayerMove(): Boolean {
         if (!canUndoPlayerMove()) return false
         val previous = defensiveMoveHistory.removeAt(defensiveMoveHistory.lastIndex)
+        if (practiceOpponents != null && previous.id == focusedPlayerId) {
+            val current = focusedPlayer()
+            ball = ball.copy(position = ball.position + (previous.position - current.position))
+        }
         players = players.map { if (it.id == previous.id) previous else it }
         playersMovedThisTurn.remove(previous.id)
         return true
@@ -452,9 +516,21 @@ class GameEngine(
 
     fun canMovePlayer(id: String): Boolean {
         val player = players.firstOrNull { it.id == id } ?: return false
-        return phase == GamePhase.DEFENDING && phaseTimeRemaining > 0f && id != focusedPlayerId &&
-            player.team != focusedPlayer().team &&
+        if (practiceOpponents != null) return phase == GamePhase.AIMING && power <= .01f
+        val positioningOpen = phase == GamePhase.DEFENDING ||
+            (phase == GamePhase.AIMING && attackerPositioning)
+        val movingTeam = if (phase == GamePhase.AIMING) focusedPlayer().team else formationTeam()
+        return positioningOpen && phaseTimeRemaining > 0f && id != focusedPlayerId &&
+            player.team == movingTeam &&
             playersMovedThisTurn.size < maxDefensiveMoves && id !in playersMovedThisTurn
+    }
+
+    private fun formationTeam(): GameTeam = if (attackerPositioning) {
+        focusedPlayer().team
+    } else if (focusedPlayer().team == GameTeam.RED) {
+        GameTeam.BLUE
+    } else {
+        GameTeam.RED
     }
 
     fun finishDefense(): Boolean {
@@ -462,6 +538,11 @@ class GameEngine(
         playerDragId?.let {
             endPlayerMove(it)
             if (phase != GamePhase.DEFENDING) return true
+        }
+        attackerPositioning = playMode == MatchPlayMode.ATTACK_DEFEND
+        if (attackerPositioning) {
+            playersMovedThisTurn.clear()
+            defensiveMoveHistory.clear()
         }
         phase = GamePhase.AIMING
         phaseTimeRemaining = timing.attackSeconds.toFloat()
@@ -471,7 +552,7 @@ class GameEngine(
     fun isZoneAvailableForPlayer(id: String, zone: Int): Boolean {
         val player = players.firstOrNull { it.id == id } ?: return false
         if (!canMovePlayer(id) && playerDragId != id) return false
-        if (openingKickoffPending && !isInOwnHalf(player.team, zone)) return false
+        if (openingKickoffPending && !attackerPositioning && !isInOwnHalf(player.team, zone)) return false
         val originZone = if (playerDragId == id) playerDragStartZone else zoneAt(player.position)
         if (originZone == null ||
             (zone != originZone && !areAdjacentZones(originZone, zone))
@@ -548,13 +629,14 @@ class GameEngine(
     private fun isLegalPlayerDragStep(id: String, from: Vector2, to: Vector2): Boolean {
         val zone = zoneAt(to) ?: return false
         if (positionOutsidePlayerBounds(to)) return false
-        if (zone != playerDragStartZone && !isZoneAvailableForPlayer(id, zone)) return false
+        if (practiceOpponents == null && zone != playerDragStartZone && !isZoneAvailableForPlayer(id, zone)) return false
         fun clearsOrEscapes(center: Vector2, required: Float): Boolean {
             val before = (from - center).length()
             val after = (to - center).length()
             return after >= required || (before < required && after > before + .0001f)
         }
-        if (!clearsOrEscapes(ball.position, playerCollisionDistance + kickerVisualGap)) return false
+        if (!(practiceOpponents != null && id == focusedPlayerId) &&
+            !clearsOrEscapes(ball.position, playerCollisionDistance + kickerVisualGap)) return false
         return players.all { it.id == id || clearsOrEscapes(it.position, playerSpacing) }
     }
     private fun positionOutsidePlayerBounds(point: Vector2) = point.x !in playerRadius..(width - playerRadius) ||
@@ -585,6 +667,7 @@ class GameEngine(
 
     fun shoot(): Boolean {
         if (phase != GamePhase.AIMING || power <= .01f) return false
+        playerDragId?.let(::endPlayerMove)
         val player = players.first { it.id == focusedPlayerId }
         soundEvents = soundEvents.copy(kicks = soundEvents.kicks + 1)
         lastShotPower = power
@@ -599,13 +682,12 @@ class GameEngine(
         val direction = AimDirection.shotVector(player.team, aimAngle)
         // Cap horizontal launch speed independently of field length; high power adds loft.
         val strength = if (dentingEnabled) player.condition.shotStrength else 1f
-        val appliedPower = power * power
-        val speed = (120f + appliedPower * 1_680f) * strength
+        val speed = ShotLaunch.speed(power, strength, physicsTuning.lobForwardRetention)
         ball = ball.copy(
             velocity = direction * speed,
             // Soft touches roll; high power increasingly turns into loft.
             // Full power close to goal can cross above the opening instead of scoring.
-            verticalVelocity = power * power * power * power * power * 3_200f * strength,
+            verticalVelocity = ShotLaunch.verticalSpeed(power, strength),
             impactSideX = 0f,
             impactSideY = 0f,
             impactStrength = 0f,
@@ -694,13 +776,16 @@ class GameEngine(
             return
         }
         if (phase == GamePhase.DEFENDING) {
+            if (practiceOpponents != null) return
             phaseTimeRemaining = (phaseTimeRemaining - dt).coerceAtLeast(0f)
             if (phaseTimeRemaining == 0f) finishDefense()
             return
         }
         if (phase == GamePhase.AIMING) {
+            if (practiceOpponents != null) return
             phaseTimeRemaining = (phaseTimeRemaining - dt).coerceAtLeast(0f)
             if (phaseTimeRemaining == 0f) {
+                playerDragId?.let(::endPlayerMove)
                 if (power > .01f) shoot() else beginTimeoutTurnover()
             }
             return
@@ -710,10 +795,12 @@ class GameEngine(
             if (goalCelebrationElapsed >= goalCelebrationDuration) {
                 if (matchTimeExpired) {
                     finishTimedMatch()
+                } else if (secondHalfPending) {
+                    startSecondHalf()
                 } else if (winner != null) {
                     phase = GamePhase.MATCH_OVER
                 } else {
-                    beginKickoff(kickoffTeam)
+                    beginKickoff(if (practiceOpponents != null) GameTeam.RED else kickoffTeam)
                 }
             }
             return
@@ -772,8 +859,8 @@ class GameEngine(
                 // kicker and bodies displaced during approach. Stale home anchors
                 // must not pull them back when the next shot activates physics.
                 players = players.map { it.copy(home = it.position, velocity = Vector2(0f, 0f)) }
-                phase = GamePhase.DEFENDING
-                phaseTimeRemaining = timing.defenseSeconds.toFloat()
+                phase = if (practiceOpponents != null) GamePhase.AIMING else GamePhase.DEFENDING
+                phaseTimeRemaining = if (practiceOpponents != null) timing.attackSeconds.toFloat() else timing.defenseSeconds.toFloat()
                 approachFrom = null
                 approachTo = null
                 approachBallFrom = null
@@ -868,10 +955,16 @@ class GameEngine(
             soundEvents = soundEvents.copy(goals = soundEvents.goals + 1)
             val scoringTeam = goalCrossing.team
             lastScoringTeam = scoringTeam
-            kickoffTeam = if (scoringTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+            kickoffTeam = if (playMode == MatchPlayMode.ATTACK_DEFEND) {
+                attackingTeam
+            } else if (scoringTeam == GameTeam.RED) {
+                GameTeam.BLUE
+            } else {
+                GameTeam.RED
+            }
             if (scoringTeam == GameTeam.RED) redScore += 1 else blueScore += 1
             winner = when {
-                targetScore == null -> null
+                targetScore == null || playMode == MatchPlayMode.ATTACK_DEFEND -> null
                 redScore >= targetScore -> GameTeam.RED
                 blueScore >= targetScore -> GameTeam.BLUE
                 else -> null
@@ -1070,6 +1163,10 @@ class GameEngine(
         if (velocity.length() < 14f && heightAboveGround == 0f && verticalVelocity == 0f) {
             ball = ball.copy(velocity = Vector2(0f, 0f))
             aimAngle = 0f
+            if (secondHalfPending) {
+                startSecondHalf()
+                return
+            }
             focusedPlayerId = nextKicker().id
             beginKickerApproach()
         }
@@ -1077,6 +1174,7 @@ class GameEngine(
 
     /** Resolve possession from physical positions, comparing one nearest player per team. */
     private fun nextKicker(): MatchPlayer {
+        if (practiceOpponents != null) return players.first { it.id == "red-striker" }
         fun nearest(team: GameTeam) = players.asSequence()
             .filter { it.team == team }
             .minWith(
@@ -1087,6 +1185,9 @@ class GameEngine(
 
         val red = nearest(GameTeam.RED)
         val blue = nearest(GameTeam.BLUE)
+        if (playMode == MatchPlayMode.ATTACK_DEFEND) {
+            return if (attackingTeam == GameTeam.RED) red else blue
+        }
         if (defensiveBlockWinsPossession && defenderBlockedShot && lastKickingTeam != null) {
             return if (lastKickingTeam == GameTeam.RED) blue else red
         }
@@ -1297,8 +1398,14 @@ class GameEngine(
 
     private fun beginTimeoutTurnover() {
         val outgoing = focusedPlayer()
-        val defendingTeam = if (outgoing.team == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
-        val incoming = players.asSequence().filter { it.team == defendingTeam }
+        val incomingTeam = if (playMode == MatchPlayMode.ATTACK_DEFEND) {
+            attackingTeam
+        } else if (outgoing.team == GameTeam.RED) {
+            GameTeam.BLUE
+        } else {
+            GameTeam.RED
+        }
+        val incoming = players.asSequence().filter { it.team == incomingTeam && it.id != outgoing.id }
             .minWith(
                 compareBy<MatchPlayer> {
                     (it.position - ball.position).length()
@@ -1444,6 +1551,7 @@ class GameEngine(
     }
 
     private fun beginKickerApproach(preserveBallPosition: Boolean = false) {
+        attackerPositioning = false
         playersMovedThisTurn.clear()
         defensiveMoveHistory.clear()
         playerDragStartState = null

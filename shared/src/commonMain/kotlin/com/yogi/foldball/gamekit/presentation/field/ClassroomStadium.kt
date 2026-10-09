@@ -63,15 +63,14 @@ fun ClassroomStadium(
         modifier = modifier
             .fillMaxWidth()
             .height(fieldHeightDp.dp)
-            .shadow(FoldballShadow.offsetY, RoundedCornerShape(26.dp))
-            .clip(RoundedCornerShape(26.dp))
+            .shadow(FoldballShadow.offsetY, RoundedCornerShape(26.dp), clip = false)
     ) {
         // Layer 1: Desk Wood Background
         Image(
             painter = painterResource(Res.drawable.home_desk_classroom),
             contentDescription = "Classroom desk",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp))
         )
 
         // Layer 2: Classroom Desk Decor (Notebook, ruler, pencil, paperclips outside pitch)
@@ -88,7 +87,7 @@ fun ClassroomStadium(
                 contentScale = ContentScale.FillBounds,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp),
+                    .padding(12.dp).clip(RoundedCornerShape(26.dp)),
                 alpha = 0.85f
             )
 
@@ -138,6 +137,8 @@ fun ClassroomStadium(
 
             // Layer 6: Match Entities & Interactive Content (Players, Ball, VFX)
             content()
+
+
         }
     }
 }
@@ -266,8 +267,8 @@ private fun ClassroomGoalBottom(modifier: Modifier = Modifier) = ClassroomGoal(m
 @Composable
 private fun ClassroomGoal(modifier: Modifier, top: Boolean) {
     Canvas(modifier) {
-        val left = size.width * .0556f
-        val right = size.width * .9444f
+        val left = size.width * .0556f + 6.dp.toPx()
+        val right = size.width * .9444f - 6.dp.toPx()
         val ground = if (top) 18.dp.toPx() else size.height - 18.dp.toPx()
         val back = ground + (if (top) -1f else 1f) * 12.dp.toPx()
         val lift = GoalGeometry.visualLift(GoalGeometry.openingHeight).dp.toPx()

@@ -1,0 +1,10 @@
+<resources>
+<style name="Theme.Foldball" parent="android:style/Theme.Material.Light.NoActionBar">
+<item name="android:windowBackground">#9A6A3C</item>
+<item name="android:colorAccent">#1F4FC4</item>
+<item name="android:windowLightStatusBar">true</item>
+</style>
+<style name="Theme.Foldball.Starting" parent="Theme.Foldball">
+<item name="android:windowBackground">@drawable/splash_background</item>
+</style>
+</resources>

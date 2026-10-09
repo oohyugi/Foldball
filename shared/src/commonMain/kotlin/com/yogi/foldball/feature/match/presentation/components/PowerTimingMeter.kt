@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.yogi.foldball.core.ui.theme.FoldballColor
 import com.yogi.foldball.core.ui.theme.TapeLabel
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 private val powerSegments = listOf(
     Color(0xFFE53935),
@@ -33,7 +35,9 @@ private val powerSegments = listOf(
 @Composable
 fun PowerTimingMeter(power: Float, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.width(56.dp),
+        modifier = modifier.width(56.dp).semantics {
+            contentDescription = "Power ${(power.coerceIn(0f, 1f) * 100).toInt()} percent"
+        },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Canvas(Modifier.width(44.dp).height(164.dp)) {

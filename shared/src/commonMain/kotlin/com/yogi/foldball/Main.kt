@@ -2,6 +2,11 @@ package com.yogi.foldball
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
+import com.yogi.foldball.feature.settings.presentation.SettingsScreen
+import com.yogi.foldball.domain.game.engine.PhysicsTuning
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +50,7 @@ import com.yogi.foldball.feature.balllab.presentation.screen.BallLabScreen
 import com.yogi.foldball.feature.club.presentation.screen.ClubRoute
 import com.yogi.foldball.feature.home.presentation.screen.HomeScreen
 import com.yogi.foldball.feature.match.presentation.screen.FullMatchScreen
+import com.yogi.foldball.feature.match.presentation.screen.MatchPracticeScreen
 import com.yogi.foldball.feature.match.presentation.screen.MatchSandboxScreen
 import com.yogi.foldball.feature.playerlab.presentation.screen.PlayerLabScreen
 import com.yogi.foldball.feature.welcome.presentation.screen.WelcomeRoute
@@ -156,6 +162,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                     onArenaClick = {
                                         openSandbox(SandboxTab.MOVEMENT)
                                     },
+                                    onSettingsClick = { navController.navigate("settings") { launchSingleTop = true } },
                                     onMatchClick = {
                                         appViewModel.onIntent(
                                             AppIntent.Play(againstBot = true)
@@ -173,6 +180,10 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                         appViewModel.onIntent(AppIntent.StyleSelected(it))
                                     },
                                     matchFormat = state.matchFormat,
+                                    matchPlayMode = state.matchPlayMode,
+                                    onMatchPlayModeChange = {
+                                        appViewModel.onIntent(AppIntent.MatchPlayModeSelected(it))
+                                    },
                                     onMatchFormatChange = {
                                         appViewModel.onIntent(AppIntent.MatchFormatSelected(it))
                                     },
@@ -199,6 +210,12 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                 })
                             }
                         }
+                        composable("settings") {
+                            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                SettingsScreen(state, { returnHome() }, { appViewModel.onIntent(AppIntent.RetrySettings) },
+                                    { tuning, use -> appViewModel.onIntent(AppIntent.SaveSettings(tuning, use)) })
+                            }
+                        }
                         composable("club") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                                 ClubRoute(
@@ -213,6 +230,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                         composable("sandbox") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                                 SandboxContent(
+                                    tuning = state.tuning,
                                     selectedTab = state.sandboxTab.name.lowercase(),
                                     onSelectTab = {
                                         appViewModel.onIntent(
@@ -226,11 +244,14 @@ private fun FoldballRoot(startAtHome: Boolean) {
                             }
                         }
                         composable("match") {
+                            val matchTuning = remember { if (state.useTuningForMatches) state.tuning else PhysicsTuning() }
                             FullMatchScreen(
+                                physicsTuning = matchTuning,
                                 playAgainstBot = state.playAgainstBot,
                                 botDifficulty = state.difficulty,
                                 botStyle = state.style,
                                 matchFormat = state.matchFormat,
+                                matchPlayMode = state.matchPlayMode,
                                 ballStyle = state.ballStyle,
                                 teamConfiguration = MatchTeamConfiguration(
                                     red =
@@ -260,18 +281,20 @@ private fun FoldballRoot(startAtHome: Boolean) {
 
 @Composable
 private fun SandboxContent(
+    tuning: PhysicsTuning,
     selectedTab: String,
     onSelectTab: (String) -> Unit,
     onHomeClick: () -> Unit
 ) {
     Column(Modifier.fillMaxSize().background(FoldballColor.Wood)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             listOf(
                 "home" to "Home",
                 "movement" to "Movement",
+                "practice" to "Practice",
                 "ball" to "Ball Lab",
                 "player" to "Player Lab"
             ).forEach { (tab, title) ->
@@ -279,13 +302,14 @@ private fun SandboxContent(
                     text = title,
                     onClick = { if (tab == "home") onHomeClick() else onSelectTab(tab) },
                     contentDescription = "Open $title",
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.widthIn(min = 64.dp),
                     selected = selectedTab == tab
                 )
             }
         }
         Box(Modifier.weight(1f)) {
             when (selectedTab) {
+                "practice" -> MatchPracticeScreen(tuning)
                 "ball" -> BallLabScreen()
                 "player" -> PlayerLabScreen()
                 else -> MatchSandboxScreen()

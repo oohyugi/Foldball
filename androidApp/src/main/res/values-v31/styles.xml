@@ -1,0 +1,5 @@
+<resources><style name="Theme.Foldball.Starting" parent="Theme.Foldball">
+<item name="android:windowSplashScreenBackground">#9A6A3C</item>
+<item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_ball</item>
+
+</style></resources>

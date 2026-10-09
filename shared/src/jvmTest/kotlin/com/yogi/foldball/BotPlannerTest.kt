@@ -162,13 +162,13 @@ class BotPlannerTest {
     }
 
     @Test fun easyAndMediumVaryRepeatedShotsWithoutMutatingLiveState() = runBlocking {
-        val engine = GameEngine(393f, 580f)
+        val engine = GameEngine(393f, 580f, physicsTuning = com.yogi.foldball.domain.game.engine.PhysicsTuning(wallBounce = .55f, groundBounce = .18f))
         engine.finishDefense()
-        val easy = BotPlanner(BotDifficulty.EASY, kotlin.random.Random(42))
+        val easy = BotPlanner(BotDifficulty.EASY, kotlin.random.Random(42), maxThinkingMillis = 6000)
         val easyShots = (1..4).map { easy.chooseShot(engine) }
         assertTrue(easyShots.distinct().size > 1)
         val original = engine.snapshot
-        val medium = BotPlanner(BotDifficulty.MEDIUM, kotlin.random.Random(42))
+        val medium = BotPlanner(BotDifficulty.MEDIUM, kotlin.random.Random(42), maxThinkingMillis = 6000)
         val mediumShots = (1..4).map { medium.chooseShot(engine) }
         assertTrue(mediumShots.distinct().size > 1)
         assertEquals(original, engine.snapshot)

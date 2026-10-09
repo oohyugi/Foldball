@@ -7,9 +7,11 @@ import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameSnapshot
 import com.yogi.foldball.domain.game.engine.GameTeam
 import com.yogi.foldball.domain.game.engine.MatchFormat
+import com.yogi.foldball.domain.game.engine.MatchPlayMode
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.game.engine.MatchTimingConfig
 import com.yogi.foldball.domain.game.engine.Vector2
+import com.yogi.foldball.domain.game.engine.PhysicsTuning
 import kotlin.math.ceil
 
 data class MatchOptions(
@@ -20,7 +22,10 @@ data class MatchOptions(
     val standeeDamage: Boolean,
     val timing: MatchTimingConfig,
     val teams: MatchTeamConfiguration,
-    val format: MatchFormat = MatchFormat.THREE_V_THREE
+    val format: MatchFormat = MatchFormat.THREE_V_THREE,
+    val playMode: MatchPlayMode = MatchPlayMode.CLASSIC,
+    val practice: Boolean = false,
+    val physicsTuning: PhysicsTuning = PhysicsTuning()
 )
 
 data class MatchUiState(
@@ -31,7 +36,9 @@ data class MatchUiState(
     val dentingEnabled: Boolean = false,
     val sessionId: Int = 0,
     val elapsedSeconds: Float = 0f,
-    val durationSeconds: Int = 180
+    val durationSeconds: Int = 180,
+    val practiceOpponents: Int = 0,
+    val physicsTuning: PhysicsTuning = PhysicsTuning()
 ) {
     val secondsRemaining: Int get() = (durationSeconds - elapsedSeconds.toInt()).coerceAtLeast(0)
     val phaseSeconds: Int get() = ceil(snapshot?.phaseTimeRemaining ?: 0f).toInt().coerceAtLeast(0)
@@ -50,6 +57,8 @@ sealed interface MatchIntent {
     data class ConfigureArena(val width: Float, val height: Float) : MatchIntent
     data class KickoffSelected(val team: GameTeam) : MatchIntent
     data class SetPaused(val paused: Boolean) : MatchIntent
+    data class SetPhysicsTuning(val tuning: PhysicsTuning) : MatchIntent
+    data class SetPracticeOpponents(val count: Int) : MatchIntent
     data class SetDamage(val enabled: Boolean) : MatchIntent
     data class BeginPlayerMove(val id: String) : MatchIntent
     data class MovePlayer(val id: String, val delta: Vector2) : MatchIntent

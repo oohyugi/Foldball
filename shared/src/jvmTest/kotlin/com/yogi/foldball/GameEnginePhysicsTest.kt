@@ -213,7 +213,7 @@ class GameEnginePhysicsTest {
 
         val dt = 1f / 60f
         var bounced = false
-        val wallBounceRestitution = .45f
+        val wallBounceRestitution = .65f
 
         repeat(200) {
             val before = engine.snapshot.ball

@@ -29,6 +29,10 @@ import com.yogi.foldball.core.ui.theme.FoldballScaffold
 import com.yogi.foldball.core.ui.theme.FoldballSpace
 import com.yogi.foldball.core.ui.theme.FoldballTilt
 import com.yogi.foldball.core.ui.theme.FoldballType
+import com.yogi.foldball.core.ui.theme.PaperIconButton
+import foldball.shared.generated.resources.Res
+import foldball.shared.generated.resources.icon_settings
+import org.jetbrains.compose.resources.painterResource
 import com.yogi.foldball.core.ui.theme.PaperButton
 import com.yogi.foldball.core.ui.theme.PaperButtonStyle
 import com.yogi.foldball.core.ui.theme.PaperCard
@@ -38,10 +42,12 @@ import com.yogi.foldball.core.ui.theme.TapeLabel
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotStyle
 import com.yogi.foldball.domain.game.engine.MatchFormat
+import com.yogi.foldball.domain.game.engine.MatchPlayMode
 import com.yogi.foldball.domain.game.engine.MatchTeamConfiguration
 import com.yogi.foldball.domain.team.BallStyle
 import com.yogi.foldball.domain.team.TeamIdentity
 import com.yogi.foldball.domain.team.withAiOpponent
+import com.yogi.foldball.feature.home.presentation.components.HowToPlayDialog
 import com.yogi.foldball.feature.home.presentation.components.DeskMenuArt
 import com.yogi.foldball.feature.home.presentation.components.MenuField
 import com.yogi.foldball.gamekit.presentation.team.ClubLogo
@@ -57,12 +63,15 @@ fun HomeScreen(
     onStyleChange: (BotStyle) -> Unit = {},
     matchFormat: MatchFormat = MatchFormat.THREE_V_THREE,
     onMatchFormatChange: (MatchFormat) -> Unit = {},
+    matchPlayMode: MatchPlayMode = MatchPlayMode.CLASSIC,
+    onMatchPlayModeChange: (MatchPlayMode) -> Unit = {},
     ballStyle: BallStyle = BallStyle.CLASSIC,
     onBallStyleChange: (BallStyle) -> Unit = {},
     club: TeamIdentity? = null,
     onClubClick: () -> Unit = {},
     onBallClick: () -> Unit = {},
     onArenaClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onHowToPlayClick: () -> Unit = {}
 ) {
     var showMatchSetup by remember { mutableStateOf(false) }
@@ -70,7 +79,16 @@ fun HomeScreen(
     var showHowToPlayDialog by remember { mutableStateOf(false) }
     var showBallStyleDialog by remember { mutableStateOf(false) }
 
-    FoldballScaffold(modifier = Modifier.fillMaxSize()) {
+    FoldballScaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            Row(Modifier.fillMaxWidth().padding(horizontal = FoldballSpace.md, vertical = FoldballSpace.sm),
+                horizontalArrangement = Arrangement.End) {
+                PaperIconButton(painterResource(Res.drawable.icon_settings), "Settings", onSettingsClick,
+                    Modifier.size(48.dp))
+            }
+        }
+    ) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = FoldballSpace.sm, vertical = FoldballSpace.md),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -174,6 +192,19 @@ fun HomeScreen(
                         }
                     }
                     Text(matchFormat.description, style = FoldballType.Body, color = FoldballColor.InkMuted)
+                    Text("Match mode", style = FoldballType.Label, color = FoldballColor.Ink)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MatchPlayMode.entries.forEach { option ->
+                            PaperChip(
+                                option.label,
+                                { onMatchPlayModeChange(option) },
+                                "${option.label}: ${option.description}",
+                                modifier = Modifier.weight(1f),
+                                selected = matchPlayMode == option
+                            )
+                        }
+                    }
+                    Text(matchPlayMode.description, style = FoldballType.Body, color = FoldballColor.InkMuted)
                     if (setupAgainstBot) {
                         Text("Difficulty", style = FoldballType.Label, color = FoldballColor.Ink)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -254,12 +285,6 @@ fun HomeScreen(
     }
 
     if (showHowToPlayDialog) {
-        PaperDialog(
-            title = "How to play",
-            message = "Fold the paper standee, aim with your finger, and flick to shoot for the goal. Protect your half during formation phase and outsmart the AI or your opponent!",
-            onDismiss = { showHowToPlayDialog = false },
-            confirmText = "Got it",
-            onConfirm = { showHowToPlayDialog = false }
-        )
+        HowToPlayDialog { showHowToPlayDialog = false }
     }
 }

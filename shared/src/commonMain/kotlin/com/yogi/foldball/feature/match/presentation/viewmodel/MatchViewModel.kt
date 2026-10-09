@@ -5,9 +5,11 @@ import com.yogi.foldball.domain.game.bot.BotAimExecution
 import com.yogi.foldball.domain.game.bot.BotDifficulty
 import com.yogi.foldball.domain.game.bot.BotMove
 import com.yogi.foldball.domain.game.bot.BotPlanner
+import com.yogi.foldball.domain.game.engine.PhysicsTuning
 import com.yogi.foldball.domain.game.engine.GameEngine
 import com.yogi.foldball.domain.game.engine.GamePhase
 import com.yogi.foldball.domain.game.engine.GameTeam
+import com.yogi.foldball.domain.game.engine.MatchPlayMode
 import com.yogi.foldball.domain.game.engine.MatchRuleFlags
 import com.yogi.foldball.domain.game.engine.Vector2
 import com.yogi.foldball.domain.team.withAiOpponent
@@ -20,6 +22,8 @@ import kotlinx.coroutines.withContext
 
 /** Owns the live engine. UI supplies frame time and animation/input commands, never physics rules. */
 class MatchViewModel(private val options: MatchOptions) : ViewModel() {
+    private var practiceOpponents = 0
+    private var physicsTuning = options.physicsTuning
     private var arena: MatchIntent.ConfigureArena? = null
     private var game: GameEngine? = null
     private var bot = newBot()
@@ -33,6 +37,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
     val snapshot get() = requireNotNull(state.value.snapshot)
     val defensiveMovesUsed get() = game?.defensiveMovesUsed ?: 0
     val currentPhase get() = snapshot.phase
+    val currentHalf get() = game?.currentHalf ?: 1
     val focusedDentProgress get() = game?.focusedDentProgress ?: 0f
     val isBotTurn get() = options.fullMatch && options.playAgainstBot &&
         bot.controls(snapshot, GameTeam.BLUE)
@@ -57,6 +62,22 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
 
             is MatchIntent.SetPaused -> {
                 state.value = state.value.copy(paused = intent.paused)
+                return true
+            }
+
+            is MatchIntent.SetPhysicsTuning -> {
+                if (!options.practice || options.fullMatch) return false
+                physicsTuning = intent.tuning
+                state.value = newState(state.value.sessionId + 1)
+                createEngine()
+                return true
+            }
+
+            is MatchIntent.SetPracticeOpponents -> {
+                if (!options.practice || options.fullMatch || intent.count !in 0..5) return false
+                practiceOpponents = intent.count
+                state.value = newState(state.value.sessionId + 1)
+                createEngine()
                 return true
             }
 
@@ -138,11 +159,19 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
         }
         val dt = deltaSeconds.coerceIn(0f, .1f)
         val elapsed = if (options.fullMatch) {
-            (current.elapsedSeconds + dt).coerceAtMost(
+            val limit = if (options.playMode == MatchPlayMode.ATTACK_DEFEND &&
+                engine.currentHalf == 1
+            ) {
+                60f
+            } else {
                 options.timing.matchSeconds.toFloat()
-            )
+            }
+            (current.elapsedSeconds + dt).coerceAtMost(limit)
         } else {
             0f
+        }
+        if (options.playMode == MatchPlayMode.ATTACK_DEFEND && elapsed >= 60f) {
+            engine.requestSecondHalf()
         }
         if (options.fullMatch && elapsed >= options.timing.matchSeconds) engine.expireMatchTime()
         state.value = current.copy(snapshot = engine.step(dt), elapsedSeconds = elapsed)
@@ -165,6 +194,14 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
             } else {
                 moves
             }
+        }
+    }
+
+    suspend fun planAttackMove(): BotMove? {
+        val simulation = requireNotNull(game).copyForSimulation()
+        val planner = bot
+        return withContext(Dispatchers.Default) {
+            planner.chooseAttackMove(simulation, GameTeam.BLUE)
         }
     }
 
@@ -191,12 +228,17 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
         game = GameEngine(
             dimensions.width,
             dimensions.height,
-            targetScore = if (options.fullMatch) 3 else null,
+            targetScore = if (options.fullMatch && options.playMode == MatchPlayMode.CLASSIC) 3 else null,
             timing = options.timing,
             initialKickoffTeam = state.value.openingKickoffTeam ?: GameTeam.RED,
             dentingEnabled = state.value.dentingEnabled,
             format = if (options.fullMatch) options.format else null,
-            defensiveBlockWinsPossession = options.fullMatch && MatchRuleFlags.DEFENSIVE_BLOCK_WINS_POSSESSION
+            defensiveBlockWinsPossession = options.fullMatch &&
+                options.playMode == MatchPlayMode.CLASSIC &&
+                MatchRuleFlags.DEFENSIVE_BLOCK_WINS_POSSESSION,
+            playMode = options.playMode,
+            practiceOpponents = if (options.practice && !options.fullMatch) practiceOpponents else null,
+            physicsTuning = if (options.practice && !options.fullMatch) physicsTuning else options.physicsTuning
         )
         publish()
     }
@@ -210,6 +252,8 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
         openingKickoffTeam = if (options.fullMatch) null else GameTeam.RED,
         dentingEnabled = options.standeeDamage,
         sessionId = sessionId,
-        durationSeconds = options.timing.matchSeconds
+        durationSeconds = options.timing.matchSeconds,
+        practiceOpponents = practiceOpponents,
+        physicsTuning = physicsTuning
     )
 }

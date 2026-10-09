@@ -1011,11 +1011,13 @@ Nilai edukasi disampaikan secara tidak langsung melalui perilaku sportif.
 
 User bermain melawan AI sederhana.
 
-### Future
-
 #### Local 2 Player
 
 Dua pemain menggunakan satu device.
+
+Mode **Classic** memakai aturan possession biasa. Mode **Attack & Defend** tersedia untuk pertandingan lokal dan VS AI, dengan dua babak 60 detik: pemenang opening toss menyerang pada babak pertama, lalu tim lain menyerang pada babak kedua. Setiap giliran, tim bertahan dapat memindahkan satu standee. Setelah itu timer serangan langsung berjalan: penyerang boleh memindahkan satu rekan selain penendang dalam waktu yang sama, atau langsung aim dan menendang tanpa reposisi. Tidak ada timer atau Skip tambahan untuk penyerang. Setelah tembakan, pantulan, atau aim timer habis, giliran menendang tetap pada tim penyerang dalam babak itu; gol tidak mengubah peran. Pergantian babak menunggu bola yang sedang bergerak selesai, mengatur ulang formasi untuk kickoff, dan mempertahankan skor. Skor tertinggi setelah dua babak menang. Dalam VS AI, bot mengikuti pilihan reposisi yang sama. Mode Classic tidak berubah.
+
+### Future
 
 #### Tournament
 

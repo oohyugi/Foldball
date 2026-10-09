@@ -16,17 +16,24 @@ private val soundAssets = listOf(
 interface SoundPlayer {
     suspend fun load(name: String, bytes: ByteArray)
     fun play(name: String, volume: Float)
+    fun playLoop(name: String, volume: Float) { play(name, volume) }
     fun stop()
     fun close()
 }
 suspend fun readSoundAsset(name: String): ByteArray {
-    require(name in soundAssets)
+    require(name in soundAssets || name == "bgm")
     return Res.readBytes("files/audio/$name.wav")
 }
 
 @Composable expect fun rememberSoundPlayer(): SoundPlayer
 
 class GameAudio(private val player: SoundPlayer) {
+    var musicEnabled by mutableStateOf(true)
+        private set
+    var musicPaused by mutableStateOf(false)
+        private set
+    fun changeMusicEnabled(value: Boolean) { musicEnabled = value }
+    fun pauseMusic(value: Boolean) { musicPaused = value }
     private var playbackGeneration = 0
     private val loaded = mutableStateMapOf<String, Boolean>()
     fun isLoaded(name: String) = loaded[name] == true
@@ -100,7 +107,23 @@ val LocalGameAudio = staticCompositionLocalOf<GameAudio?> { null }
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     DisposableEffect(player) { onDispose { player.close() } }
+    BackgroundMusic(audio)
     return audio
+}
+
+@Composable
+private fun BackgroundMusic(audio: GameAudio) {
+    val player = rememberSoundPlayer()
+    var ready by remember { mutableStateOf(false) }
+    LaunchedEffect(player) {
+        player.load("bgm", readSoundAsset("bgm"))
+        ready = true
+    }
+    LaunchedEffect(ready, audio.musicEnabled, audio.foreground, audio.musicPaused) {
+        player.stop()
+        if (ready && audio.musicEnabled && audio.foreground && !audio.musicPaused) player.playLoop("bgm", .12f)
+    }
+    DisposableEffect(player) { onDispose { player.close() } }
 }
 
 /** Consume event counters even while muted/paused; visual decay never retriggers audio. */

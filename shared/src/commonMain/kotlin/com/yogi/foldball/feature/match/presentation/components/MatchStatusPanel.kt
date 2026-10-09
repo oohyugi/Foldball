@@ -23,6 +23,7 @@ import com.yogi.foldball.core.ui.theme.FoldballShapes
 import com.yogi.foldball.core.ui.theme.FoldballTilt
 import com.yogi.foldball.core.ui.theme.FoldballType
 import com.yogi.foldball.core.ui.theme.PaperButton
+import com.yogi.foldball.core.ui.theme.PaperButtonStyle
 import com.yogi.foldball.core.ui.theme.PaperCard
 import com.yogi.foldball.core.ui.theme.PaperChip
 import com.yogi.foldball.domain.game.engine.GamePhase
@@ -48,12 +49,14 @@ fun MatchStatusPanel(
 ) {
     val activeTeam = snapshot.players.first { it.id == snapshot.focusedPlayerId }.team
     val defendingTeam = if (activeTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
-    val shownTeam = if (snapshot.phase == GamePhase.DEFENDING) defendingTeam else activeTeam
+    val shownTeam = if (snapshot.phase == GamePhase.DEFENDING) snapshot.formationTeam ?: defendingTeam else activeTeam
     val teamColor = if (shownTeam == GameTeam.RED) teamConfiguration.kitColor(GameTeam.RED) else teamConfiguration.kitColor(GameTeam.BLUE)
     val timed = snapshot.phase == GamePhase.DEFENDING || snapshot.phase == GamePhase.AIMING
     val seconds = ceil(snapshot.phaseTimeRemaining).toInt()
     val title = when (snapshot.phase) {
-        GamePhase.DEFENDING -> if (snapshot.openingKickoffPending) {
+        GamePhase.DEFENDING -> if (snapshot.attackerPositioning) {
+            "TEAM ${teamConfiguration.forTeam(activeTeam).name} POSITIONING"
+        } else if (snapshot.openingKickoffPending) {
             "OPENING KICKOFF · ${teamConfiguration.forTeam(activeTeam).name}"
         } else {
             "TEAM ${teamConfiguration.forTeam(defendingTeam).name} DEFENDING"
@@ -75,6 +78,7 @@ fun MatchStatusPanel(
     }
     val detail = when {
         isPaused -> "MATCH PAUSED"
+        snapshot.phase == GamePhase.DEFENDING && snapshot.attackerPositioning -> "$defensiveMovesUsed/1 attacker moved"
         snapshot.phase == GamePhase.DEFENDING && snapshot.openingKickoffPending -> "Defenders may move only within their own half"
         snapshot.phase == GamePhase.DEFENDING -> "$defensiveMovesUsed/2 players moved"
         snapshot.phase == GamePhase.AIMING -> "Aim · ${(snapshot.aimAngle * 180f / kotlin.math.PI.toFloat()).toInt()}°"
@@ -90,17 +94,33 @@ fun MatchStatusPanel(
                 contentAlignment = Alignment.Center
             ) {
                 Row(
-                    Modifier.padding(horizontal = 20.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        if (isBotTurn) "BOT POSITIONING" else "MOVE 1 DEFENDER",
+                        when {
+                            isBotTurn -> "BOT POSITIONING"
+                            snapshot.attackerPositioning -> "MOVE 1 ATTACKER"
+                            defensiveMovesUsed > 0 -> "DEFENDER MOVED"
+                            else -> "MOVE 1 DEFENDER"
+                        },
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         style = FoldballType.Caption.copy(fontSize = 12.sp),
                         color = FoldballColor.Ink
                     )
+                    if (canUndo && !isBotTurn) {
+                        PaperButton(
+                            "Undo", onUndo,
+                            enabled = !isPaused,
+                            style = PaperButtonStyle.Secondary,
+                            compact = true
+                        )
+                    }
                     PaperButton(
-                        "Skip",
+                        if (defensiveMovesUsed > 0) "Done" else "Skip",
                         onFinishDefense,
                         enabled = !isPaused && !isBotTurn,
                         compact = true
@@ -109,24 +129,39 @@ fun MatchStatusPanel(
             }
 
             GamePhase.AIMING -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PaperCard(
-                    modifier = Modifier.heightIn(min = 48.dp, max = 56.dp),
-                    shape = FoldballShapes.Chip,
-                    tilt = FoldballTilt.TapeLabel,
-                    ruled = false
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        when {
-                            isBotTurn -> "BOT IS AIMING"
-                            else -> "Drag kicker to aim\nHold for power, then release"
-                        },
-                        modifier = Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
-                        style = FoldballType.Caption.copy(fontSize = 12.sp),
-                        color = FoldballColor.Ink,
-                        maxLines = 2,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                    PaperCard(
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp, max = 56.dp),
+                        shape = FoldballShapes.Chip,
+                        tilt = FoldballTilt.TapeLabel,
+                        ruled = false
+                    ) {
+                        Text(
+                            when {
+                                isBotTurn -> "BOT IS AIMING"
+
+                                snapshot.attackerPositioning && defensiveMovesUsed == 0 ->
+                                    "Move a teammate or aim kicker\nHold for power, then release"
+
+                                else -> "Drag kicker to aim\nHold for power, then release"
+                            },
+                            modifier = Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
+                            style = FoldballType.Caption.copy(fontSize = 12.sp),
+                            color = FoldballColor.Ink,
+                            maxLines = 2,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                    if (snapshot.attackerPositioning && canUndo && !isBotTurn) {
+                        PaperButton("Undo", onUndo, enabled = !isPaused,
+                            style = PaperButtonStyle.Secondary, compact = true)
+                    }
                 }
+
             }
 
             else -> Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -216,7 +251,7 @@ fun MatchStatusPanel(
                     PaperChip(
                         "OK",
                         onFinishDefense,
-                        "Finish defensive positioning",
+                        if (snapshot.attackerPositioning) "Finish attacking positioning" else "Finish defensive positioning",
                         Modifier.padding(start = 6.dp)
                     )
                 }

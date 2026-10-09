@@ -100,18 +100,43 @@ class GameEngineFlowTest {
     }
 
     @Test
-    fun fullMatchStartsAimingAfterOneValidDefensiveMove() {
+    fun classicDefenderMoveCanBeUndoneBeforeConfirmation() {
         for (format in MatchFormat.entries) {
             val engine = GameEngine(393f, 580f, targetScore = null, format = format)
-            assertEquals(1, engine.defensiveMoveLimit)
-            val moved = engine.snapshot.players.filter { engine.canMovePlayer(it.id) }.any { player ->
-                (1..GameEngine.ZONE_COUNT).any { zone -> engine.movePlayerToZone(player.id, zone) }
-            }
-            assertTrue(moved)
+            val before = engine.snapshot.players
+            val remaining = engine.snapshot.phaseTimeRemaining
+            val player = before.first { engine.canMovePlayer(it.id) }
+            val zone = (1..GameEngine.ZONE_COUNT).first { engine.legalPlayerPositionInZone(player.id, it) != null }
+            assertTrue(engine.movePlayerToZone(player.id, zone))
+            assertEquals(GamePhase.DEFENDING, engine.snapshot.phase)
             assertEquals(1, engine.defensiveMovesUsed)
+            assertTrue(engine.canUndoPlayerMove())
+            assertTrue(engine.snapshot.players.none { engine.canMovePlayer(it.id) })
+            assertTrue(engine.undoLastPlayerMove())
+            assertEquals(before, engine.snapshot.players)
+            assertEquals(remaining, engine.snapshot.phaseTimeRemaining)
+            assertEquals(0, engine.defensiveMovesUsed)
+            assertTrue(engine.canMovePlayer(player.id))
+            assertTrue(engine.movePlayerToZone(player.id, zone))
+            assertTrue(engine.finishDefense())
             assertEquals(GamePhase.AIMING, engine.snapshot.phase)
             assertTrue(!engine.canUndoPlayerMove())
-            assertTrue(!engine.movePlayerToZone("blue-left", 13))
+            assertTrue(!engine.undoLastPlayerMove())
+        }
+    }
+
+    @Test
+    fun classicMovedDefenderConfirmsWhenFormationTimerExpires() {
+        for (format in MatchFormat.entries) {
+            val engine = GameEngine(393f, 580f, format = format, timing = MatchTimingConfig(1, 12))
+            val player = engine.snapshot.players.first { engine.canMovePlayer(it.id) }
+            val zone = (1..GameEngine.ZONE_COUNT).first { engine.legalPlayerPositionInZone(player.id, it) != null }
+            assertTrue(engine.movePlayerToZone(player.id, zone))
+            val moved = engine.snapshot.players.first { it.id == player.id }
+            repeat(4) { engine.step(.25f) }
+            assertEquals(GamePhase.AIMING, engine.snapshot.phase)
+            assertEquals(moved, engine.snapshot.players.first { it.id == player.id })
+            assertTrue(!engine.canUndoPlayerMove())
         }
     }
 

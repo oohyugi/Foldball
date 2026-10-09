@@ -25,6 +25,14 @@ private class IosSoundPlayer : SoundPlayer {
         player.volume = volume
         player.play()
     }
+    override fun playLoop(name: String, volume: Float) {
+        val player = players[name]?.firstOrNull() ?: return
+        player.stop()
+        player.currentTime = 0.0
+        player.numberOfLoops = -1
+        player.volume = volume
+        player.play()
+    }
     override fun stop() {
         players.values.flatten().forEach { it.stop() }
     }

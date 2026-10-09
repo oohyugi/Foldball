@@ -1,6 +1,7 @@
 package com.yogi.foldball.core.audio
 
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.SoundPool
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
@@ -21,6 +22,7 @@ class AndroidSoundPlayer(private val cacheDir: File, private val diagnostics: Bo
     private val ready = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
     private val streams = ArrayDeque<Int>()
     private val files = mutableListOf<File>()
+    private var music: MediaPlayer? = null
     private var closed = false
     init {
         pool.setOnLoadCompleteListener { _, id, status ->
@@ -42,6 +44,19 @@ class AndroidSoundPlayer(private val cacheDir: File, private val diagnostics: Bo
             return
         }
         files.add(file)
+        if (name == "bgm") {
+            val prepared = withContext(Dispatchers.IO) {
+                MediaPlayer().apply {
+                    setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                    setDataSource(file.absolutePath)
+                    isLooping = true
+                    prepare()
+                }
+            }
+            if (closed) prepared.release() else music = prepared
+            return
+        }
         val id = pool.load(file.absolutePath, 1)
         ids[name] = id
         // SoundPool loading is asynchronous; do not start the opening before decode completes.
@@ -68,7 +83,12 @@ class AndroidSoundPlayer(private val cacheDir: File, private val diagnostics: Bo
             if (streams.size > 12) streams.removeFirst()
         }
     }
+    override fun playLoop(name: String, volume: Float) {
+        if (closed || name != "bgm") return
+        music?.apply { setVolume(volume, volume); seekTo(0); start() }
+    }
     override fun stop() {
+        music?.let { if (it.isPlaying) it.pause() }
         if (!closed) streams.forEach { pool.stop(it) }
         streams.clear()
     }
@@ -77,6 +97,8 @@ class AndroidSoundPlayer(private val cacheDir: File, private val diagnostics: Bo
         stop()
         closed = true
         pool.release()
+        music?.release()
+        music = null
         files.forEach { it.delete() }
         files.clear()
     }

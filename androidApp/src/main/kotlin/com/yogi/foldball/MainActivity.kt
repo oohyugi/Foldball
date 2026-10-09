@@ -11,6 +11,7 @@ import com.yogi.foldball.feature.home.presentation.screen.HomeScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_Foldball)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 

@@ -45,7 +45,7 @@ class BotPlanner(
     fun controls(state: GameSnapshot, team: GameTeam): Boolean {
         val kickerTeam = state.players.first { it.id == state.focusedPlayerId }.team
         return when (state.phase) {
-            GamePhase.DEFENDING -> kickerTeam != team
+            GamePhase.DEFENDING -> state.formationTeam == team
             GamePhase.AIMING -> kickerTeam == team
             else -> false
         }
@@ -80,7 +80,7 @@ class BotPlanner(
         val levelLimit = when (difficulty) {
             BotDifficulty.EASY -> 120L
             BotDifficulty.MEDIUM -> 250L
-            BotDifficulty.HARD -> 650L
+            BotDifficulty.HARD -> 1100L
         }
         // Reserve time to apply the decision before the live phase clock expires.
         val remaining = (engine.snapshot.phaseTimeRemaining * 1000 - 300).toLong().coerceAtLeast(1L)
@@ -90,7 +90,7 @@ class BotPlanner(
             when (difficulty) {
                 BotDifficulty.EASY -> 48
                 BotDifficulty.MEDIUM -> 88
-                BotDifficulty.HARD -> 140
+                BotDifficulty.HARD -> 340
             }
         )
     }
@@ -129,25 +129,23 @@ class BotPlanner(
         val initialLimit = when (difficulty) {
             BotDifficulty.EASY -> 30
             BotDifficulty.MEDIUM -> 58
-            BotDifficulty.HARD -> 44
+            BotDifficulty.HARD -> 100
         }
-        search@ for (angle in directions) {
-            for (power in powers) {
-                if (budget.expired ||
-                    (candidates.isNotEmpty() && budget.simulations >= initialLimit)
-                ) {
-                    break@search
-                }
-                val shot = BotShot(angle, power)
-                val result = simulate(engine, shot, budget) ?: break@search
-                val value = evaluate(result, team) - shotPenalty(engine, result, shot)
-                candidates += Candidate(shot, result, value)
-                // Compare goal routes too, so repeated ricochets do not win by search order.
+        // Hard samples every direction at controlled power before spending budget on loft.
+        val shots = if (difficulty == BotDifficulty.HARD) {
+            listOf(.5f, .65f, .8f, .35f, 1f).flatMap { power ->
+                directions.map { angle -> BotShot(angle, power) }
             }
+        } else directions.flatMap { angle -> powers.map { power -> BotShot(angle, power) } }
+        for (shot in shots) {
+            if (budget.expired || (candidates.isNotEmpty() && budget.simulations >= initialLimit)) break
+            val result = simulate(engine, shot, budget) ?: break
+            val value = evaluate(result, team) - shotPenalty(engine, result, shot)
+            candidates += Candidate(shot, result, value)
         }
         if (candidates.isEmpty()) return BotShot(0f, .65f)
         if (difficulty == BotDifficulty.HARD) {
-            val refinementLimit = 62
+            val refinementLimit = 130
             val seeds = candidates.sortedByDescending { it.value }.take(3)
             refine@ for (seed in seeds) {
                 for (angleDelta in listOf(-.035f, 0f, .035f)) {
@@ -260,7 +258,10 @@ class BotPlanner(
             BotStyle.TOTAL_FOOTBALL -> contacts * 20f
             BotStyle.BALANCED -> 0f
         }
-        return contacts * contactCost + repeats * 90f + styleCost
+        // Do not avoid a sound winning route just because it worked on the previous turn.
+        val repetitionCost = if (difficulty == BotDifficulty.HARD &&
+            result.currentPhase == GamePhase.GOAL) 0f else repeats * 90f
+        return contacts * contactCost + repetitionCost + styleCost
     }
 
     /** Mirror target across the actual ball/wall contact line to seed bank shots. */
@@ -338,10 +339,10 @@ class BotPlanner(
                 engine,
                 team,
                 banks = true
-            ).take(5) + listOf(-.7f, .7f)
+            ).take(7) + listOf(-.7f, .7f)
             ).distinct()
         for (angle in directions) {
-            for (power in listOf(.8f, 1f)) {
+            for (power in listOf(.5f, .65f, .8f, 1f)) {
                 val result = simulate(engine, BotShot(angle, power), budget) ?: return null
                 strongest = maxOf(strongest, evaluate(result, team))
                 if (strongest >= 10000f) {
@@ -410,6 +411,7 @@ class BotPlanner(
             }
             if (difficulty != BotDifficulty.HARD || budget.expired) return fallback
             val options = formationBeam(engine, team, budget, width = 4)
+                .sortedByDescending { defensiveValue(it.engine, team) }
             var best: List<BotMove>? = null
             var bestValue = -Float.MAX_VALUE
             for (formation in options) {
@@ -426,6 +428,39 @@ class BotPlanner(
         } finally {
             onSearchCompleted?.invoke(budget.stats())
         }
+    }
+
+    /** One quick supporting run toward the attacking goal; the kicker stays in place. */
+    fun chooseAttackMove(engine: GameEngine, team: GameTeam): BotMove? {
+        if (!controls(engine.snapshot, team) || !engine.snapshot.attackerPositioning) return null
+        val goalY = if (team == GameTeam.RED) 0f else engine.fieldHeight
+        val ball = engine.snapshot.ball.position
+        return engine.snapshot.players.asSequence()
+            .filter { it.team == team && engine.canMovePlayer(it.id) }
+            .flatMap { player ->
+                (1..GameEngine.ZONE_COUNT).asSequence().mapNotNull { zone ->
+                    if (!engine.isAdjacentZoneForPlayer(player.id, zone)) return@mapNotNull null
+                    val destination = engine.legalPlayerPositionInZone(player.id, zone) ?: return@mapNotNull null
+                    val forward = kotlin.math.abs(player.position.y - goalY) - kotlin.math.abs(destination.y - goalY)
+                    val support = (player.position - ball).length() - (destination - ball).length()
+                    val goal = Vector2(engine.fieldWidth * .5f, goalY)
+                    val lane = goal - ball
+                    val laneLength = lane.x * lane.x + lane.y * lane.y
+                    fun obstructs(point: Vector2): Boolean {
+                        val relative = point - ball
+                        val t = if (laneLength > 0f) (relative.x * lane.x + relative.y * lane.y) / laneLength else 0f
+                        return t in .05f..1f && (point - (ball + lane * t)).length() < engine.standeeBallContactDistance
+                    }
+                    val opensLane = if (difficulty == BotDifficulty.HARD) {
+                        (if (obstructs(player.position)) 100f else 0f) -
+                            (if (obstructs(destination)) 180f else 0f)
+                    } else 0f
+                    BotMove(player.id, zone) to (forward + support * .25f + opensLane)
+                }
+            }
+            .maxByOrNull { it.second.takeIf { score -> score > 4f } ?: -Float.MAX_VALUE }
+            ?.takeIf { it.second > 4f }
+            ?.first
     }
 
     private fun opposite(team: GameTeam) = if (team == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
@@ -519,13 +554,16 @@ class BotPlanner(
         val state = engine.snapshot
         val goalY = if (team == GameTeam.BLUE) 0f else engine.fieldHeight
         val defenders = state.players.filter { it.team == team }
-        // Cover three goal lanes; only players between ball and goal can block them.
-        val lanes = when (difficulty) {
+        // Only players between the ball and goal can cover a sampled goal lane.
+        val lanes = if (style == BotStyle.PARK_BUS) {
+            // Include both posts; a compact center cluster still leaves wide shots open.
+            listOf(.35f, .40f, .45f, .50f, .55f, .60f, .65f)
+        } else when (difficulty) {
             BotDifficulty.EASY -> listOf(.5f)
             BotDifficulty.MEDIUM -> listOf(.4f, .5f, .6f)
             BotDifficulty.HARD -> listOf(.38f, .44f, .5f, .56f, .62f)
         }
-        val coverage = lanes.sumOf { goalX ->
+        val laneDistances = lanes.map { goalX ->
             val end = Vector2(engine.fieldWidth * goalX, goalY)
             val segment = end - state.ball.position
             val lengthSquared = segment.x * segment.x + segment.y * segment.y
@@ -544,7 +582,11 @@ class BotPlanner(
                     (player.position - (state.ball.position + segment * t)).length()
                 }
             }
-            (1f - closest / 100f).coerceIn(0f, 1f).toDouble()
+            closest
+        }
+        val coverage = laneDistances.sumOf {
+            val distance = if (difficulty == BotDifficulty.HARD) engine.standeeBallContactDistance else 100f
+            (1f - it / distance).coerceIn(0f, 1f).toDouble()
         }.toFloat()
         val anchor = defenders.minOf {
             (it.position - Vector2(engine.fieldWidth / 2, goalY)).length()
@@ -560,8 +602,21 @@ class BotPlanner(
         val spread =
             (defenders.maxOf { it.position.x } - defenders.minOf { it.position.x }) /
                 engine.fieldWidth
+        if (style == BotStyle.PARK_BUS) {
+            // Real contact width, not the broad positioning bonus used by other styles.
+            val contact = engine.standeeBallContactDistance
+            val blocked = laneDistances.count { it <= contact }.toFloat() / lanes.size
+            val centerBlocked = if (laneDistances[lanes.indexOf(.5f)] <= contact) 1f else 0f
+            val closing = laneDistances.sumOf {
+                (1f - (it - contact).coerceAtLeast(0f) / (contact * 1.5f))
+                    .coerceIn(0f, 1f).toDouble()
+            }.toFloat() / lanes.size
+            // Closing an open shot outweighs retreating; shape breaks comparable choices.
+            return blocked * 500f + centerBlocked * 180f + closing * 60f -
+                depth * 25f - anchor / engine.fieldHeight * 10f
+        }
         val styleBonus = when (style) {
-            BotStyle.PARK_BUS -> coverage * 55f - depth * 120f
+            BotStyle.PARK_BUS -> 0f // Physical lane coverage is evaluated above.
             BotStyle.KICK_RUSH -> -nearestBall * 100f + depth * 35f
             BotStyle.TOTAL_FOOTBALL -> -nearestBall * 75f + spread * 35f + coverage * 20f
             BotStyle.BALANCED -> 0f

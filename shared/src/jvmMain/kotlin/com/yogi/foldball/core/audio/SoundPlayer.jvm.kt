@@ -38,6 +38,10 @@ private class DesktopSoundPlayer : SoundPlayer {
         }
         clip.start()
     }
+    override fun playLoop(name: String, volume: Float) {
+        play(name, volume)
+        clips[name]?.firstOrNull()?.loop(Clip.LOOP_CONTINUOUSLY)
+    }
     override fun stop() {
         clips.values.flatten().forEach { it.stop() }
     }
