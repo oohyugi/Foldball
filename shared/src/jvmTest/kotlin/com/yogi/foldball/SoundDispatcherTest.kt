@@ -19,6 +19,20 @@ class SoundDispatcherTest {
         assertEquals(listOf("kick"), sounds)
     }
 
+    @Test fun foulPlaysWhistleOnceAndMuteAndGoalTakePrecedence() {
+        val snapshot = GameEngine(360f, 600f).snapshot
+        val dispatcher = SoundDispatcher(snapshot.soundEvents)
+        val sounds = mutableListOf<String>()
+        val foul = snapshot.copy(soundEvents = SoundEvents(fouls = 1, impacts = 1))
+        dispatcher.dispatch(foul, 0, true) { name, _ -> sounds.add(name) }
+        dispatcher.dispatch(foul, 500, true) { name, _ -> sounds.add(name) }
+        val muted = foul.copy(soundEvents = SoundEvents(fouls = 2, impacts = 2))
+        dispatcher.dispatch(muted, 1000, false) { name, _ -> sounds.add(name) }
+        dispatcher.dispatch(muted, 1500, true) { name, _ -> sounds.add(name) }
+        dispatcher.dispatch(snapshot.copy(soundEvents = SoundEvents(fouls = 3, goals = 1)), 2000, true) { name, _ -> sounds.add(name) }
+        assertEquals(listOf("whistle", "goal"), sounds)
+    }
+
     @Test fun goalAndPostOverrideImpactAndImpactHasCooldown() {
         val snapshot = GameEngine(360f, 600f).snapshot
         val dispatcher = SoundDispatcher(snapshot.soundEvents)

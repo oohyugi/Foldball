@@ -34,12 +34,14 @@ class SettingsPersistenceTest {
                 if (save) {
                     assertEquals(PhysicsTuning(), vm.uiState.value.tuning)
                     assertFalse(vm.uiState.value.useTuningForMatches)
-                    vm.onIntent(AppIntent.SaveSettings(tuning, true))
+                    assertFalse(vm.uiState.value.threeActionTurns)
+                    vm.onIntent(AppIntent.SaveSettings(tuning, true, true))
                 }
                 val state = withTimeout(5000) {
                     vm.uiState.first { it.tuning == tuning && it.useTuningForMatches && !it.settingsSaving }
                 }
                 assertNull(state.settingsError)
+                assertTrue(state.threeActionTurns)
             } finally { models.clear(); job.cancelAndJoin() }
         }
         try { session(true); session(false) }

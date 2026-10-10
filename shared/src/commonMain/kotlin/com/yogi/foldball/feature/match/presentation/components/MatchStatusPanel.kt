@@ -42,6 +42,7 @@ fun MatchStatusPanel(
     showPower: Boolean,
     onUndo: () -> Unit,
     onFinishDefense: () -> Unit,
+    onEndTurn: () -> Unit = {},
     isBotTurn: Boolean = false,
     compactMatchBar: Boolean = false,
     teamConfiguration: MatchTeamConfiguration = MatchTeamConfiguration.Default,
@@ -100,6 +101,9 @@ fun MatchStatusPanel(
                 ) {
                     Text(
                         when {
+                            snapshot.playerMovePreview?.valid == false -> "CANNOT PLACE HERE"
+                            snapshot.playerMovePreview != null -> "RELEASE TO PLACE"
+                            snapshot.openingFormation -> "ARRANGE YOUR HALF"
                             isBotTurn -> "BOT POSITIONING"
                             snapshot.attackerPositioning -> "MOVE 1 ATTACKER"
                             defensiveMovesUsed > 0 -> "DEFENDER MOVED"
@@ -120,7 +124,7 @@ fun MatchStatusPanel(
                         )
                     }
                     PaperButton(
-                        if (defensiveMovesUsed > 0) "Done" else "Skip",
+                        if (snapshot.openingFormation) "Ready" else if (defensiveMovesUsed > 0) "Done" else "Skip",
                         onFinishDefense,
                         enabled = !isPaused && !isBotTurn,
                         compact = true
@@ -142,7 +146,10 @@ fun MatchStatusPanel(
                     ) {
                         Text(
                             when {
+                                snapshot.playerMovePreview?.valid == false -> "Cannot place here\nRelease to cancel"
+                                snapshot.playerMovePreview != null -> "Release to place player"
                                 isBotTurn -> "BOT IS AIMING"
+                                snapshot.threeActionTurns -> "Move a teammate\nHold kicker to shoot"
 
                                 snapshot.attackerPositioning && defensiveMovesUsed == 0 ->
                                     "Move a teammate or aim kicker\nHold for power, then release"
@@ -158,6 +165,10 @@ fun MatchStatusPanel(
                     }
                     if (snapshot.attackerPositioning && canUndo && !isBotTurn) {
                         PaperButton("Undo", onUndo, enabled = !isPaused,
+                            style = PaperButtonStyle.Secondary, compact = true)
+                    }
+                    if (snapshot.threeActionTurns) {
+                        PaperButton("End turn", onEndTurn, enabled = !isPaused && !isBotTurn && snapshot.power <= .01f,
                             style = PaperButtonStyle.Secondary, compact = true)
                     }
                 }

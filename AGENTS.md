@@ -16,3 +16,9 @@ Before proposing, editing, or implementing any user interface, read [`docs/Foldb
 ## UI language
 
 - All user-facing UI copy must be in English, including commentary, controls, status messages, descriptions, and accessibility labels. User-created club names are preserved as entered.
+
+## Commits
+
+- Exclude `referensi_assets/` from commits unless the user explicitly asks to include it. This applies to additions, modifications, and deletions, including requests to commit all current changes.
+- Preserve local files and changes in `referensi_assets/`; excluding them from a commit must not reset or delete them.
+- Stage intended paths explicitly and inspect the staged diff before committing. Avoid blanket `git add -A` or `git add .` that could include reference assets.

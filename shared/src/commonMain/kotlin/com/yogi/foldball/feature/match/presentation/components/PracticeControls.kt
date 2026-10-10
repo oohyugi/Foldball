@@ -30,6 +30,7 @@ fun PracticeControls(count: Int, tuning: PhysicsTuning, onCount: (Int) -> Unit,
             PaperButton("Reset shot", onReset, Modifier.weight(1f), style = PaperButtonStyle.Secondary, compact = true)
             PaperButton("Tuning", { showTuning = true }, Modifier.weight(1f), compact = true)
         }
+        Text("Red circles: foul range after contact", color = FoldballColor.Ink, style = FoldballType.Caption)
     }
     if (showTuning) {
         var draft by remember(tuning) { mutableStateOf(tuning) }

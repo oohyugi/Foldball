@@ -71,8 +71,11 @@ data class SoundEvents(
     val goals: Int = 0,
     val blocks: Int = 0,
     val crossbars: Int = 0,
-    val overbars: Int = 0
+    val overbars: Int = 0,
+    val fouls: Int = 0
 )
+
+data class PlayerMovePreview(val id: String, val position: Vector2, val valid: Boolean)
 
 data class GameSnapshot(
     val players: List<MatchPlayer>,
@@ -92,6 +95,10 @@ data class GameSnapshot(
     val lastShotPower: Float,
     val formationTeam: GameTeam? = null,
     val attackerPositioning: Boolean = false,
+    val threeActionTurns: Boolean = false,
+    val openingFormation: Boolean = false,
+    val actionsUsed: Int = 0,
+    val playerMovePreview: PlayerMovePreview? = null,
     val soundEvents: SoundEvents = SoundEvents()
 )
 
@@ -100,7 +107,8 @@ private data class PlayerCollision(
     val time: Float,
     val center: Vector2,
     val normal: Vector2,
-    val contactPoint: Vector2
+    val contactPoint: Vector2,
+    val ballHeight: Float
 )
 
 private data class BallMotion(
@@ -129,8 +137,14 @@ class GameEngine(
     private val defensiveBlockWinsPossession: Boolean = false,
     private val playMode: MatchPlayMode = MatchPlayMode.CLASSIC,
     private val practiceOpponents: Int? = null,
-    private val physicsTuning: PhysicsTuning = PhysicsTuning()
+    private val physicsTuning: PhysicsTuning = PhysicsTuning(),
+    threeActionTurns: Boolean = false
 ) {
+    private val threeActionTurns = threeActionTurns && playMode == MatchPlayMode.CLASSIC && practiceOpponents == null
+    private var formationSeconds = 15f
+    private var setupTeam: GameTeam? = if (this.threeActionTurns) GameTeam.RED else null
+    private var actionsUsed = 0
+    private var turnTeam = initialKickoffTeam
     private var matchTimeExpired = false
     private var attackingTeam = initialKickoffTeam
     private var secondHalfPending = false
@@ -227,8 +241,9 @@ class GameEngine(
     }
 
     // Immutable formation anchors. A player's mutable home follows defensive moves
-    // during a rally, but every kickoff starts from these original positions.
+    // during a rally. Experimental kickoffs instead use each confirmed setup.
     private val startingFormationHomeById = players.associate { it.id to it.home }
+    private var kickoffFormationById = startingFormationHomeById
     private var ball =
         MatchBall(Vector2(width * .5f, height * .5f), Vector2(0f, 0f), ballRadius, 0f, 0f, 0f, 0f)
     private var phase = GamePhase.DEFENDING
@@ -241,6 +256,7 @@ class GameEngine(
         "blue-striker"
     }
     private var lastKickingTeam: GameTeam? = null
+    private var touchedOpponentIds = emptySet<String>()
     private var defenderBlockedShot = false
     private var launchingKickerId: String? = null
     private var aimAngle = 0f
@@ -265,6 +281,7 @@ class GameEngine(
     private var turnoverNextKickerId: String? = null
     private val contactCooldownByPlayerId = mutableMapOf<String, Float>()
     private var shotKickerAnchor: Vector2? = null
+    private var previewPlayerDrag = false
     private var playerDragId: String? = null
     private var playerDragStart = Vector2(0f, 0f)
     private var playerDragStartState: MatchPlayer? = null
@@ -293,6 +310,7 @@ class GameEngine(
             player.copy(position = kickoffHome, home = kickoffHome)
         }
         moveFocusedBehindBall()
+        if (this.threeActionTurns) phaseTimeRemaining = 15f
         if (practiceOpponents != null) {
             phase = GamePhase.AIMING
             phaseTimeRemaining = timing.attackSeconds.toFloat()
@@ -313,8 +331,15 @@ class GameEngine(
             defensiveBlockWinsPossession,
             playMode,
             practiceOpponents,
-            physicsTuning
+            physicsTuning,
+            threeActionTurns
         )
+        copy.formationSeconds = formationSeconds
+        copy.kickoffFormationById = kickoffFormationById
+        copy.previewPlayerDrag = previewPlayerDrag
+        copy.setupTeam = setupTeam
+        copy.actionsUsed = actionsUsed
+        copy.turnTeam = turnTeam
         copy.matchTimeExpired = matchTimeExpired
         copy.attackingTeam = attackingTeam
         copy.secondHalfPending = secondHalfPending
@@ -326,6 +351,7 @@ class GameEngine(
         copy.phaseTimeRemaining = phaseTimeRemaining
         copy.focusedPlayerId = focusedPlayerId
         copy.lastKickingTeam = lastKickingTeam
+        copy.touchedOpponentIds = touchedOpponentIds
         copy.defenderBlockedShot = defenderBlockedShot
         copy.launchingKickerId = launchingKickerId
         copy.aimAngle = aimAngle
@@ -406,7 +432,7 @@ class GameEngine(
             phase = phase,
             phaseTimeRemaining = phaseTimeRemaining,
             phaseTimeTotal = when (phase) {
-                GamePhase.DEFENDING -> timing.defenseSeconds.toFloat()
+                GamePhase.DEFENDING -> if (setupTeam != null) formationSeconds else timing.defenseSeconds.toFloat()
                 GamePhase.AIMING -> timing.attackSeconds.toFloat()
                 else -> 0f
             },
@@ -421,13 +447,21 @@ class GameEngine(
             openingKickoffPending = openingKickoffPending,
             lastShotPower = lastShotPower,
             formationTeam = if (phase == GamePhase.DEFENDING) formationTeam() else null,
-            attackerPositioning = attackerPositioning,
+            attackerPositioning = attackerPositioning || (threeActionTurns && phase == GamePhase.AIMING),
+            threeActionTurns = threeActionTurns,
+            openingFormation = setupTeam != null,
+            actionsUsed = actionsUsed,
+            playerMovePreview = if (previewPlayerDrag) playerDragId?.let { id ->
+                val position = playerDragStart + playerDragDelta
+                PlayerMovePreview(id, position, isLegalPlayerDrop(id, position))
+            } else null,
             soundEvents = soundEvents
         )
 
-    fun beginPlayerMove(id: String) {
+    fun beginPlayerMove(id: String, previewOnly: Boolean = false) {
         val player = players.firstOrNull { it.id == id } ?: return
         if (!canMovePlayer(id)) return
+        previewPlayerDrag = previewOnly
         playerDragId = id
         playerDragStart = player.position
         playerDragStartState = player
@@ -436,13 +470,17 @@ class GameEngine(
     }
 
     fun moveInactivePlayer(id: String, delta: Vector2) {
-        if ((phase != GamePhase.DEFENDING && !(phase == GamePhase.AIMING && (attackerPositioning || practiceOpponents != null))) ||
+        if ((phase != GamePhase.DEFENDING && !(phase == GamePhase.AIMING && (attackerPositioning || threeActionTurns || practiceOpponents != null))) ||
             playerDragId != id
         ) {
             return
         }
         val player = players.firstOrNull { it.id == id } ?: return
         if (practiceOpponents == null && player.team != formationTeam()) return
+        if (previewPlayerDrag) {
+            playerDragDelta += delta
+            return
+        }
         val blockedTravel = playerDragStart + playerDragDelta - player.position
         if (blockedTravel.x * delta.x + blockedTravel.y * delta.y < 0f) {
             playerDragDelta = player.position - playerDragStart
@@ -479,6 +517,16 @@ class GameEngine(
 
     fun endPlayerMove(id: String) {
         if (playerDragId == id) {
+            if (previewPlayerDrag) {
+                val destination = playerDragStart + playerDragDelta
+                if (isLegalPlayerDrop(id, destination)) {
+                    if (practiceOpponents != null && id == focusedPlayerId) {
+                        ball = ball.copy(position = ball.position + (destination - playerDragStart))
+                    }
+                    players = players.map { if (it.id == id) it.copy(position = destination, home = destination, velocity = Vector2(0f, 0f)) else it }
+                }
+                previewPlayerDrag = false
+            }
             val finalPosition = players.firstOrNull { it.id == id }?.position
             if (finalPosition != null && (finalPosition - playerDragStart).length() > .5f) {
                 playersMovedThisTurn += id
@@ -488,16 +536,43 @@ class GameEngine(
             playerDragStartState = null
             playerDragDelta = Vector2(0f, 0f)
             playerDragStartZone = null
-
+            if (threeActionTurns && setupTeam == null && finalPosition != null && (finalPosition - playerDragStart).length() > .5f) {
+                actionsUsed++
+                if (actionsUsed >= 3) endTurn()
+            }
         }
     }
 
+    fun cancelPlayerMove(id: String): Boolean {
+        if (playerDragId != id || !previewPlayerDrag) return false
+        previewPlayerDrag = false
+        playerDragId = null
+        playerDragStartState = null
+        playerDragDelta = Vector2(0f, 0f)
+        playerDragStartZone = null
+        return true
+    }
+
+    private fun isLegalPlayerDrop(id: String, position: Vector2): Boolean {
+        val zone = zoneAt(position) ?: return false
+        if (positionOutsidePlayerBounds(position)) return false
+        if (practiceOpponents == null && !isZoneAvailableForPlayer(id, zone)) return false
+        if (players.any { it.id != id && (it.position - position).length() < playerSpacing }) return false
+        if (practiceOpponents != null && id == focusedPlayerId) {
+            val movedBall = ball.position + (position - playerDragStart)
+            if (movedBall.x !in (wallInset + ballRadius)..(width - wallInset - ballRadius) ||
+                movedBall.y !in (wallInset + ballRadius)..(height - wallInset - ballRadius)) return false
+            return players.none { it.id != id && (it.position - movedBall).length() < playerCollisionDistance }
+        }
+        return (position - ball.position).length() >= playerCollisionDistance + kickerVisualGap
+    }
+
     val defensiveMovesUsed: Int get() = defensiveMoveHistory.size
-    val defensiveMoveLimit: Int get() = maxDefensiveMoves
+    val defensiveMoveLimit: Int get() = if (setupTeam != null) players.count { it.team == setupTeam } else maxDefensiveMoves
 
     fun canUndoPlayerMove(): Boolean {
         val positioningOpen = phase == GamePhase.DEFENDING ||
-            (phase == GamePhase.AIMING && (attackerPositioning || practiceOpponents != null))
+            (phase == GamePhase.AIMING && (attackerPositioning || threeActionTurns || practiceOpponents != null))
         return positioningOpen && phaseTimeRemaining > 0f && playerDragId == null &&
             power <= .01f && defensiveMoveHistory.isNotEmpty()
     }
@@ -511,12 +586,16 @@ class GameEngine(
         }
         players = players.map { if (it.id == previous.id) previous else it }
         playersMovedThisTurn.remove(previous.id)
+        if (threeActionTurns && setupTeam == null) actionsUsed = (actionsUsed - 1).coerceAtLeast(0)
         return true
     }
 
     fun canMovePlayer(id: String): Boolean {
         val player = players.firstOrNull { it.id == id } ?: return false
         if (practiceOpponents != null) return phase == GamePhase.AIMING && power <= .01f
+        if (threeActionTurns) return phaseTimeRemaining > 0f && power <= .01f &&
+            ((phase == GamePhase.DEFENDING && setupTeam == player.team) ||
+                (phase == GamePhase.AIMING && setupTeam == null && actionsUsed < 3 && player.team == turnTeam && id != focusedPlayerId))
         val positioningOpen = phase == GamePhase.DEFENDING ||
             (phase == GamePhase.AIMING && attackerPositioning)
         val movingTeam = if (phase == GamePhase.AIMING) focusedPlayer().team else formationTeam()
@@ -525,7 +604,7 @@ class GameEngine(
             playersMovedThisTurn.size < maxDefensiveMoves && id !in playersMovedThisTurn
     }
 
-    private fun formationTeam(): GameTeam = if (attackerPositioning) {
+    private fun formationTeam(): GameTeam = setupTeam ?: if (threeActionTurns && phase == GamePhase.AIMING) turnTeam else if (attackerPositioning) {
         focusedPlayer().team
     } else if (focusedPlayer().team == GameTeam.RED) {
         GameTeam.BLUE
@@ -539,6 +618,19 @@ class GameEngine(
             endPlayerMove(it)
             if (phase != GamePhase.DEFENDING) return true
         }
+        if (setupTeam != null) {
+            kickoffFormationById = kickoffFormationById + players.filter { it.team == setupTeam }.associate { it.id to it.position }
+            defensiveMoveHistory.clear()
+            playersMovedThisTurn.clear()
+            if (setupTeam == GameTeam.RED) {
+                setupTeam = GameTeam.BLUE
+                phaseTimeRemaining = formationSeconds
+            } else {
+                setupTeam = null
+                beginKickerApproach(preserveBallPosition = true)
+            }
+            return true
+        }
         attackerPositioning = playMode == MatchPlayMode.ATTACK_DEFEND
         if (attackerPositioning) {
             playersMovedThisTurn.clear()
@@ -550,9 +642,11 @@ class GameEngine(
     }
 
     fun isZoneAvailableForPlayer(id: String, zone: Int): Boolean {
+        if (zone !in 1..ZONE_COUNT) return false
         val player = players.firstOrNull { it.id == id } ?: return false
         if (!canMovePlayer(id) && playerDragId != id) return false
-        if (openingKickoffPending && !attackerPositioning && !isInOwnHalf(player.team, zone)) return false
+        if ((setupTeam != null || (!threeActionTurns && openingKickoffPending && !attackerPositioning)) && !isInOwnHalf(player.team, zone)) return false
+        if (threeActionTurns) return true
         val originZone = if (playerDragId == id) playerDragStartZone else zoneAt(player.position)
         if (originZone == null ||
             (zone != originZone && !areAdjacentZones(originZone, zone))
@@ -566,7 +660,7 @@ class GameEngine(
         if (zone !in 1..ZONE_COUNT) return false
         val player = players.firstOrNull { it.id == id } ?: return false
         val originZone = if (playerDragId == id) playerDragStartZone else zoneAt(player.position)
-        return originZone != null && zone != originZone && areAdjacentZones(originZone, zone)
+        return originZone != null && zone != originZone && (threeActionTurns || areAdjacentZones(originZone, zone))
     }
 
     /** Returns a collision-safe destination inside the requested zone, if one exists. */
@@ -668,11 +762,15 @@ class GameEngine(
     fun shoot(): Boolean {
         if (phase != GamePhase.AIMING || power <= .01f) return false
         playerDragId?.let(::endPlayerMove)
+        if (phase != GamePhase.AIMING) return false
+        if (threeActionTurns) actionsUsed++
+        defensiveMoveHistory.clear()
         val player = players.first { it.id == focusedPlayerId }
         soundEvents = soundEvents.copy(kicks = soundEvents.kicks + 1)
         lastShotPower = power
         openingKickoffPending = false
         lastKickingTeam = player.team
+        touchedOpponentIds = emptySet()
         defenderBlockedShot = false
         launchingKickerId = player.id
         shotKickerAnchor = player.position
@@ -786,6 +884,7 @@ class GameEngine(
             phaseTimeRemaining = (phaseTimeRemaining - dt).coerceAtLeast(0f)
             if (phaseTimeRemaining == 0f) {
                 playerDragId?.let(::endPlayerMove)
+                if (phase != GamePhase.AIMING) return
                 if (power > .01f) shoot() else beginTimeoutTurnover()
             }
             return
@@ -859,8 +958,8 @@ class GameEngine(
                 // kicker and bodies displaced during approach. Stale home anchors
                 // must not pull them back when the next shot activates physics.
                 players = players.map { it.copy(home = it.position, velocity = Vector2(0f, 0f)) }
-                phase = if (practiceOpponents != null) GamePhase.AIMING else GamePhase.DEFENDING
-                phaseTimeRemaining = if (practiceOpponents != null) timing.attackSeconds.toFloat() else timing.defenseSeconds.toFloat()
+                phase = if (practiceOpponents != null || threeActionTurns) GamePhase.AIMING else GamePhase.DEFENDING
+                phaseTimeRemaining = if (practiceOpponents != null || threeActionTurns) timing.attackSeconds.toFloat() else timing.defenseSeconds.toFloat()
                 approachFrom = null
                 approachTo = null
                 approachBallFrom = null
@@ -1072,14 +1171,16 @@ class GameEngine(
             ) {
                 return@mapNotNull null
             }
-            PlayerCollision(player, time, center, normal, contactPoint)
+            PlayerCollision(player, time, center, normal, contactPoint, heightAtContact)
         }.minByOrNull { it.time }
 
         if (collision != null && velocity.length() > 12f) {
             soundEvents = soundEvents.copy(blocks = soundEvents.blocks + 1)
             soundEvents = soundEvents.copy(impacts = soundEvents.impacts + 1)
             val player = collision.player
-            if (defensiveBlockWinsPossession && lastKickingTeam != null && player.team != lastKickingTeam) {
+            val hitOpponent = lastKickingTeam != null && player.team != lastKickingTeam
+            if (hitOpponent) touchedOpponentIds = touchedOpponentIds + player.id
+            if (hitOpponent && !threeActionTurns && defensiveBlockWinsPossession) {
                 defenderBlockedShot = true
             }
             val normal = collision.normal
@@ -1167,6 +1268,13 @@ class GameEngine(
                 startSecondHalf()
                 return
             }
+            if ((threeActionTurns || practiceOpponents != null) && players.any {
+                    it.id in touchedOpponentIds &&
+                        (it.position - ball.position).length() <= playerCollisionDistance + ball.radius * 2f
+                }) {
+                soundEvents = soundEvents.copy(fouls = soundEvents.fouls + 1)
+                if (threeActionTurns) defenderBlockedShot = true
+            }
             focusedPlayerId = nextKicker().id
             beginKickerApproach()
         }
@@ -1185,6 +1293,13 @@ class GameEngine(
 
         val red = nearest(GameTeam.RED)
         val blue = nearest(GameTeam.BLUE)
+        if (threeActionTurns) {
+            if (defenderBlockedShot || actionsUsed >= 3) {
+                turnTeam = if (turnTeam == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
+                actionsUsed = 0
+            }
+            return if (turnTeam == GameTeam.RED) red else blue
+        }
         if (playMode == MatchPlayMode.ATTACK_DEFEND) {
             return if (attackingTeam == GameTeam.RED) red else blue
         }
@@ -1396,6 +1511,12 @@ class GameEngine(
         return GoalLineCrossing(crossing.first, crossing.second, crossingX, crossingHeight)
     }
 
+    fun endTurn(): Boolean {
+        if (!threeActionTurns || setupTeam != null || phase != GamePhase.AIMING || power > .01f || playerDragId != null) return false
+        beginTimeoutTurnover()
+        return true
+    }
+
     private fun beginTimeoutTurnover() {
         val outgoing = focusedPlayer()
         val incomingTeam = if (playMode == MatchPlayMode.ATTACK_DEFEND) {
@@ -1405,6 +1526,7 @@ class GameEngine(
         } else {
             GameTeam.RED
         }
+        if (threeActionTurns) { turnTeam = incomingTeam; actionsUsed = 0 }
         val incoming = players.asSequence().filter { it.team == incomingTeam && it.id != outgoing.id }
             .minWith(
                 compareBy<MatchPlayer> {
@@ -1436,7 +1558,7 @@ class GameEngine(
             val steps = ceil(path.length() / 5f).toInt().coerceAtLeast(1)
             (candidate - outgoing.position).length() > 1f &&
                 (candidate - ball.position).length() >= playerCollisionDistance + kickerVisualGap &&
-                players.none { it.id != outgoing.id && zoneAt(it.position) == zoneAt(candidate) } &&
+                (threeActionTurns || players.none { it.id != outgoing.id && zoneAt(it.position) == zoneAt(candidate) }) &&
                 (1..steps).all { step ->
                     val point = outgoing.position + path * (step.toFloat() / steps)
                     players.none {
@@ -1456,10 +1578,13 @@ class GameEngine(
     }
 
     private fun beginKickoff(team: GameTeam) {
+        touchedOpponentIds = emptySet()
         defenderBlockedShot = false
         launchingKickerId = null
+        if (threeActionTurns) { turnTeam = team; actionsUsed = 0 }
         players = players.map { player ->
             val kickoffHome = when {
+                threeActionTurns -> kickoffFormationById.getValue(player.id)
                 player.id == "red-striker" -> strikerKickoffPosition(
                     zone = 8,
                     team = GameTeam.RED,
@@ -1503,7 +1628,18 @@ class GameEngine(
         playerDragStartState = null
         playerDragDelta = Vector2(0f, 0f)
         playerDragStartZone = null
-        beginKickerApproach()
+        if (threeActionTurns) {
+            previewPlayerDrag = false
+            playersMovedThisTurn.clear()
+            defensiveMoveHistory.clear()
+            formationSeconds = 10f
+            setupTeam = GameTeam.RED
+            openingKickoffPending = true
+            phase = GamePhase.DEFENDING
+            phaseTimeRemaining = formationSeconds
+        } else {
+            beginKickerApproach()
+        }
     }
 
     private fun strikerKickoffPosition(zone: Int, team: GameTeam, isKickingOff: Boolean): Vector2 {

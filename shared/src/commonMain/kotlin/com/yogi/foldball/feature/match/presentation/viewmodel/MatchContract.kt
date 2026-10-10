@@ -25,7 +25,8 @@ data class MatchOptions(
     val format: MatchFormat = MatchFormat.THREE_V_THREE,
     val playMode: MatchPlayMode = MatchPlayMode.CLASSIC,
     val practice: Boolean = false,
-    val physicsTuning: PhysicsTuning = PhysicsTuning()
+    val physicsTuning: PhysicsTuning = PhysicsTuning(),
+    val threeActionTurns: Boolean = false
 )
 
 data class MatchUiState(
@@ -46,6 +47,7 @@ data class MatchUiState(
         val current = snapshot ?: return GameTeam.RED
         val attacker = current.players.first { it.id == current.focusedPlayerId }.team
         return if (current.phase == GamePhase.DEFENDING) {
+            current.formationTeam ?:
             if (attacker == GameTeam.RED) GameTeam.BLUE else GameTeam.RED
         } else {
             attacker
@@ -60,14 +62,16 @@ sealed interface MatchIntent {
     data class SetPhysicsTuning(val tuning: PhysicsTuning) : MatchIntent
     data class SetPracticeOpponents(val count: Int) : MatchIntent
     data class SetDamage(val enabled: Boolean) : MatchIntent
-    data class BeginPlayerMove(val id: String) : MatchIntent
+    data class BeginPlayerMove(val id: String, val previewOnly: Boolean = false) : MatchIntent
     data class MovePlayer(val id: String, val delta: Vector2) : MatchIntent
+    data class CancelPlayerMove(val id: String) : MatchIntent
     data class EndPlayerMove(val id: String) : MatchIntent
     data class MoveToZone(val id: String, val zone: Int) : MatchIntent
     data class AimBy(val delta: Float) : MatchIntent
     data class SetAim(val angle: Float) : MatchIntent
     data class SetPower(val power: Float) : MatchIntent
     data object Undo : MatchIntent
+    data object EndTurn : MatchIntent
     data object FinishDefense : MatchIntent
     data object Shoot : MatchIntent
     data object Rematch : MatchIntent

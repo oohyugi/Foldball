@@ -38,6 +38,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
     val defensiveMovesUsed get() = game?.defensiveMovesUsed ?: 0
     val currentPhase get() = snapshot.phase
     val currentHalf get() = game?.currentHalf ?: 1
+    val standeeBallContactDistance get() = game?.standeeBallContactDistance ?: 38f
     val focusedDentProgress get() = game?.focusedDentProgress ?: 0f
     val isBotTurn get() = options.fullMatch && options.playAgainstBot &&
         bot.controls(snapshot, GameTeam.BLUE)
@@ -61,7 +62,8 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
             }
 
             is MatchIntent.SetPaused -> {
-                state.value = state.value.copy(paused = intent.paused)
+                if (intent.paused) state.value.snapshot?.playerMovePreview?.let { game?.cancelPlayerMove(it.id) }
+                state.value = state.value.copy(paused = intent.paused, snapshot = game?.snapshot)
                 return true
             }
 
@@ -107,7 +109,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
         }
         val accepted = when (intent) {
             is MatchIntent.BeginPlayerMove -> {
-                engine.beginPlayerMove(intent.id)
+                engine.beginPlayerMove(intent.id, intent.previewOnly)
                 true
             }
 
@@ -115,6 +117,8 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
                 engine.moveInactivePlayer(intent.id, intent.delta)
                 true
             }
+
+            is MatchIntent.CancelPlayerMove -> engine.cancelPlayerMove(intent.id)
 
             is MatchIntent.EndPlayerMove -> {
                 engine.endPlayerMove(intent.id)
@@ -141,6 +145,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
             MatchIntent.Undo -> engine.undoLastPlayerMove()
 
             MatchIntent.FinishDefense -> engine.finishDefense()
+            MatchIntent.EndTurn -> engine.endTurn()
 
             MatchIntent.Shoot -> engine.shoot()
         }
@@ -158,7 +163,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
             return
         }
         val dt = deltaSeconds.coerceIn(0f, .1f)
-        val elapsed = if (options.fullMatch) {
+        val elapsed = if (engine.snapshot.openingFormation) current.elapsedSeconds else if (options.fullMatch) {
             val limit = if (options.playMode == MatchPlayMode.ATTACK_DEFEND &&
                 engine.currentHalf == 1
             ) {
@@ -238,6 +243,7 @@ class MatchViewModel(private val options: MatchOptions) : ViewModel() {
                 MatchRuleFlags.DEFENSIVE_BLOCK_WINS_POSSESSION,
             playMode = options.playMode,
             practiceOpponents = if (options.practice && !options.fullMatch) practiceOpponents else null,
+            threeActionTurns = options.fullMatch && options.threeActionTurns,
             physicsTuning = if (options.practice && !options.fullMatch) physicsTuning else options.physicsTuning
         )
         publish()

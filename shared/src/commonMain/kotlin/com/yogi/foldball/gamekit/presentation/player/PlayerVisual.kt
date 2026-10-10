@@ -46,6 +46,8 @@ fun PaperPlayer(
     modifier: Modifier = Modifier,
     facing: PlayerFacing = PlayerFacing.FRONT,
     focusState: PlayerFocusState = PlayerFocusState.INACTIVE,
+    placementValid: Boolean? = null,
+    showTurnMarker: Boolean = false,
     powerProgress: Float = 0f,
     dented: Boolean = false,
     dentProgress: Float = if (dented) 1f else 0f,
@@ -77,15 +79,38 @@ fun PaperPlayer(
     val isKicking = focusState == PlayerFocusState.KICKING
     val isActive = isFocused || isKicking
     val normalizedPower = if (isActive) powerProgress.coerceIn(0f, 1f) else 0f
-    val focusTransition = rememberInfiniteTransition()
-    val focusPulse by focusTransition.animateFloat(
-        initialValue = .72f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900), repeatMode = RepeatMode.Reverse)
-    )
+    val focusPulse = if (isFocused && placementValid == null) {
+        val focusTransition = rememberInfiniteTransition()
+        val pulse by focusTransition.animateFloat(
+            initialValue = .72f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(900), repeatMode = RepeatMode.Reverse)
+        )
+        pulse
+    } else 1f
     BoxWithConstraints(modifier) {
         val labelScale = (maxWidth.value / 148f).coerceIn(.4f, 1.2f)
         Canvas(Modifier.fillMaxSize()) {
+            placementValid?.let { valid ->
+                // Inset visual feedback around the body; keep the full touch area.
+                val background = if (valid) FoldballColor.Grass else FoldballColor.TeamRed
+                val highlightOrigin = androidx.compose.ui.geometry.Offset(size.width * .15f, size.height * .10f)
+                val highlightSize = androidx.compose.ui.geometry.Size(size.width * .70f, size.height * .72f)
+                drawRect(background.copy(alpha = .52f), highlightOrigin, highlightSize)
+                drawRect(FoldballColor.Paper.copy(alpha = .9f), highlightOrigin, highlightSize, style = Stroke(4.dp.toPx()))
+                drawRect(background, highlightOrigin, highlightSize, style = Stroke(2.dp.toPx()))
+            }
+            if (showTurnMarker) {
+                val marker = Path().apply {
+                    moveTo(size.width * .42f, size.height * .015f)
+                    lineTo(size.width * .58f, size.height * .015f)
+                    lineTo(size.width * .50f, size.height * .105f)
+                    close()
+                }
+                drawPath(marker, FoldballColor.Paper, style = Stroke(4.dp.toPx()))
+                drawPath(marker, jerseyColor)
+                drawPath(marker, FoldballColor.Ink, style = Stroke(1.dp.toPx()))
+            }
             val sx = size.width / 512f
             val sy = size.height / 512f
             fun p(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(x * sx, y * sy)
@@ -119,7 +144,7 @@ fun PaperPlayer(
                 style = Stroke(width = 4.dp.toPx())
             )
         }
-        if (isFocused || isFormation) {
+        if ((isFocused || isFormation) && placementValid == null) {
             Canvas(Modifier.fillMaxSize()) {
                 val focusPad = Path().apply {
                     // FRONT faces down-screen: extend behind the foot pivot, not behind the head.

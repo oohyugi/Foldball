@@ -409,7 +409,7 @@ class BotPlanner(
                     }
                 }
             }
-            if (difficulty != BotDifficulty.HARD || budget.expired) return fallback
+            if (engine.snapshot.openingFormation || difficulty != BotDifficulty.HARD || budget.expired) return fallback
             val options = formationBeam(engine, team, budget, width = 4)
                 .sortedByDescending { defensiveValue(it.engine, team) }
             var best: List<BotMove>? = null

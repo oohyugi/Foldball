@@ -181,6 +181,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                                     },
                                     matchFormat = state.matchFormat,
                                     matchPlayMode = state.matchPlayMode,
+                                    threeActionTurns = state.threeActionTurns,
                                     onMatchPlayModeChange = {
                                         appViewModel.onIntent(AppIntent.MatchPlayModeSelected(it))
                                     },
@@ -213,7 +214,7 @@ private fun FoldballRoot(startAtHome: Boolean) {
                         composable("settings") {
                             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                                 SettingsScreen(state, { returnHome() }, { appViewModel.onIntent(AppIntent.RetrySettings) },
-                                    { tuning, use -> appViewModel.onIntent(AppIntent.SaveSettings(tuning, use)) })
+                                    { tuning, use, turns -> appViewModel.onIntent(AppIntent.SaveSettings(tuning, use, turns)) })
                             }
                         }
                         composable("club") {
@@ -244,9 +245,11 @@ private fun FoldballRoot(startAtHome: Boolean) {
                             }
                         }
                         composable("match") {
+                            val matchThreeActionTurns = remember { state.threeActionTurns }
                             val matchTuning = remember { if (state.useTuningForMatches) state.tuning else PhysicsTuning() }
                             FullMatchScreen(
                                 physicsTuning = matchTuning,
+                                threeActionTurns = matchThreeActionTurns,
                                 playAgainstBot = state.playAgainstBot,
                                 botDifficulty = state.difficulty,
                                 botStyle = state.style,

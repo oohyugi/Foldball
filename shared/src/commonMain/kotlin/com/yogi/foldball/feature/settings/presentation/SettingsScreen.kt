@@ -14,9 +14,10 @@ import com.yogi.foldball.feature.match.presentation.components.TuningSlider
 
 @Composable
 fun SettingsScreen(state: AppUiState, onBack: () -> Unit, onRetry: () -> Unit,
-    onSave: (PhysicsTuning, Boolean) -> Unit) {
+    onSave: (PhysicsTuning, Boolean, Boolean) -> Unit) {
     var tuning by remember(state.settingsLoaded) { mutableStateOf(state.tuning) }
     var useForMatches by remember(state.settingsLoaded) { mutableStateOf(state.useTuningForMatches) }
+    var threeActionTurns by remember(state.settingsLoaded) { mutableStateOf(state.threeActionTurns) }
     val enabled = state.settingsLoaded && !state.settingsSaving
     FoldballScaffold {
         Column(Modifier.fillMaxSize().padding(FoldballSpace.md), verticalArrangement = Arrangement.spacedBy(FoldballSpace.md)) {
@@ -27,6 +28,12 @@ fun SettingsScreen(state: AppUiState, onBack: () -> Unit, onRetry: () -> Unit,
                 }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(FoldballSpace.md)) {
+                PaperCard(Modifier.fillMaxWidth(), tilt = FoldballTilt.PaperCard) {
+                    Column(Modifier.padding(FoldballSpace.md)) {
+                        PaperToggle("3-action turns (Experimental)", threeActionTurns, { if (enabled) threeActionTurns = it })
+                        Text("Classic only. Arrange each team for 15 seconds initially and 10 seconds after each goal, then move or kick up to 3 times per turn. A low center hit on an opponent ends your turn; side rebounds are allowed. Applies to your next match.", color = FoldballColor.Ink, style = FoldballType.Body)
+                    }
+                }
                 PaperCard(Modifier.fillMaxWidth(), tilt = FoldballTilt.PaperCard) {
                     Column(Modifier.padding(FoldballSpace.md), verticalArrangement = Arrangement.spacedBy(FoldballSpace.sm)) {
                         Text("Advanced physics", color = FoldballColor.Ink, style = FoldballType.Title)
@@ -46,7 +53,7 @@ fun SettingsScreen(state: AppUiState, onBack: () -> Unit, onRetry: () -> Unit,
                     }
                 }
             }
-            PaperButton(if (state.settingsSaving) "Saving" else "Save settings", { onSave(tuning, useForMatches) },
+            PaperButton(if (state.settingsSaving) "Saving" else "Save settings", { onSave(tuning, useForMatches, threeActionTurns) },
                 Modifier.fillMaxWidth(), enabled = enabled)
         }
     }

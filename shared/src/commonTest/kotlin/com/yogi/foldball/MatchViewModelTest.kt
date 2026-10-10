@@ -11,6 +11,8 @@ import com.yogi.foldball.domain.team.TeamProfile
 import com.yogi.foldball.feature.match.presentation.viewmodel.MatchIntent
 import com.yogi.foldball.feature.match.presentation.viewmodel.MatchOptions
 import com.yogi.foldball.feature.match.presentation.viewmodel.MatchViewModel
+import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -18,7 +20,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class MatchViewModelTest {
-    private fun match(full: Boolean = true, duration: Int = 180, practice: Boolean = false): MatchViewModel {
+    private fun match(full: Boolean = true, duration: Int = 180, practice: Boolean = false, threeActionTurns: Boolean = false): MatchViewModel {
         val teams =
             MatchTeamConfiguration(
                 red = requireNotNull(TeamProfile.create("My Club", 5)).toMatchIdentity()
@@ -32,9 +34,47 @@ class MatchViewModelTest {
                 true,
                 MatchTimingConfig(matchSeconds = duration),
                 teams,
-                practice = practice
+                practice = practice,
+                threeActionTurns = threeActionTurns
             )
         ).apply { onIntent(MatchIntent.ConfigureArena(340f, 580f)) }
+    }
+
+    @Test fun experimentalSetupDoesNotSpendMatchTimeAndPauseStopsItsTimer() {
+        val vm = match(threeActionTurns = true)
+        assertTrue(vm.onIntent(MatchIntent.KickoffSelected(GameTeam.BLUE)))
+        assertTrue(vm.snapshot.openingFormation)
+        repeat(50) { vm.advanceFrame(.1f) }
+        assertEquals(0f, vm.uiState.value.elapsedSeconds)
+        val remaining = vm.snapshot.phaseTimeRemaining
+        vm.onIntent(MatchIntent.SetPaused(true))
+        repeat(20) { vm.advanceFrame(.1f) }
+        assertEquals(remaining, vm.snapshot.phaseTimeRemaining)
+        vm.onIntent(MatchIntent.SetPaused(false))
+        assertTrue(vm.onIntent(MatchIntent.FinishDefense))
+        assertEquals(GameTeam.BLUE, vm.snapshot.formationTeam)
+        repeat(50) { vm.advanceFrame(.1f) }
+        assertEquals(0f, vm.uiState.value.elapsedSeconds)
+        assertTrue(vm.onIntent(MatchIntent.FinishDefense))
+        repeat(40) { vm.advanceFrame(1f / 60f) }
+        assertEquals(GamePhase.AIMING, vm.snapshot.phase)
+        assertTrue(vm.uiState.value.elapsedSeconds > 0f)
+        assertTrue(vm.onIntent(MatchIntent.EndTurn))
+        repeat(90) { vm.advanceFrame(1f / 60f) }
+        assertEquals(GameTeam.RED, vm.uiState.value.activeTeam)
+    }
+
+    @Test fun pausingCancelsPlacementPreviewWithoutMovingPlayer() {
+        val vm = match(threeActionTurns = true)
+        vm.onIntent(MatchIntent.KickoffSelected(GameTeam.RED))
+        val before = vm.snapshot.players
+        vm.onIntent(MatchIntent.BeginPlayerMove("red-left", previewOnly = true))
+        vm.onIntent(MatchIntent.MovePlayer("red-left", com.yogi.foldball.domain.game.engine.Vector2(20f, 0f)))
+        assertNotNull(vm.snapshot.playerMovePreview)
+        vm.onIntent(MatchIntent.SetPaused(true))
+        assertNull(vm.snapshot.playerMovePreview)
+        assertEquals(before, vm.snapshot.players)
+        assertEquals(0, vm.snapshot.actionsUsed)
     }
 
     @Test fun practiceCountResetAndTimersKeepOneHumanKicker() {

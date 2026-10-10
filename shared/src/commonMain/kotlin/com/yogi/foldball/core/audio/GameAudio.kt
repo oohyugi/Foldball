@@ -153,6 +153,8 @@ class SoundDispatcher(initial: SoundEvents) {
         when {
             next.goals > old.goals -> emit("goal", .7f, 400)
 
+            next.fouls > old.fouls -> emit("whistle", .55f, 400)
+
             next.posts > old.posts -> emit("post", .6f)
 
             next.impacts > old.impacts -> emit("impact", .25f + snapshot.ball.impactStrength * .25f)

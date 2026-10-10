@@ -47,8 +47,9 @@ class AppViewModel(
                             it[floatPreferencesKey("physics_ground")] = intent.tuning.groundBounce
                             it[floatPreferencesKey("physics_forward")] = intent.tuning.lobForwardRetention
                             it[booleanPreferencesKey("physics_matches")] = intent.useForMatches
+                            it[booleanPreferencesKey("three_action_turns")] = intent.threeActionTurns
                         }
-                        state.update { it.copy(tuning = intent.tuning, useTuningForMatches = intent.useForMatches, settingsSaving = false) }
+                        state.update { it.copy(tuning = intent.tuning, useTuningForMatches = intent.useForMatches, threeActionTurns = intent.threeActionTurns, settingsSaving = false) }
                     } catch (e: CancellationException) { throw e }
                     catch (_: Exception) { state.update { it.copy(settingsSaving = false, settingsError = "Couldn't save settings. Please retry.") } }
                 }
@@ -100,7 +101,7 @@ class AppViewModel(
                         (preferences[floatPreferencesKey("physics_ground")] ?: PhysicsTuning().groundBounce).coerceIn(0f, 1f),
                         (preferences[floatPreferencesKey("physics_forward")] ?: 1f).coerceIn(.55f, 1f)
                     )
-                    state.update { it.copy(tuning = tuning, useTuningForMatches = preferences[booleanPreferencesKey("physics_matches")] ?: false, settingsLoaded = true) }
+                    state.update { it.copy(tuning = tuning, useTuningForMatches = preferences[booleanPreferencesKey("physics_matches")] ?: false, threeActionTurns = preferences[booleanPreferencesKey("three_action_turns")] ?: false, settingsLoaded = true) }
                 }
             } catch (e: CancellationException) { throw e }
             catch (_: Exception) { state.update { it.copy(settingsError = "Couldn't load settings. Please retry.") } }

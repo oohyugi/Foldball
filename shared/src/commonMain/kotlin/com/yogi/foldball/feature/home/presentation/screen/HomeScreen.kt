@@ -64,6 +64,7 @@ fun HomeScreen(
     matchFormat: MatchFormat = MatchFormat.THREE_V_THREE,
     onMatchFormatChange: (MatchFormat) -> Unit = {},
     matchPlayMode: MatchPlayMode = MatchPlayMode.CLASSIC,
+    threeActionTurns: Boolean = false,
     onMatchPlayModeChange: (MatchPlayMode) -> Unit = {},
     ballStyle: BallStyle = BallStyle.CLASSIC,
     onBallStyleChange: (BallStyle) -> Unit = {},
@@ -204,7 +205,7 @@ fun HomeScreen(
                             )
                         }
                     }
-                    Text(matchPlayMode.description, style = FoldballType.Body, color = FoldballColor.InkMuted)
+                    Text(if (threeActionTurns && matchPlayMode == MatchPlayMode.CLASSIC) "Experimental · Arrange before every kickoff, then 3 actions per turn." else matchPlayMode.description, style = FoldballType.Body, color = FoldballColor.InkMuted)
                     if (setupAgainstBot) {
                         Text("Difficulty", style = FoldballType.Label, color = FoldballColor.Ink)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

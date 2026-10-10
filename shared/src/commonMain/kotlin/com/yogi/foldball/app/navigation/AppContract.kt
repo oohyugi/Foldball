@@ -31,6 +31,7 @@ data class AppUiState(
     val sandboxTab: SandboxTab = SandboxTab.MOVEMENT,
     val tuning: PhysicsTuning = PhysicsTuning(),
     val useTuningForMatches: Boolean = false,
+    val threeActionTurns: Boolean = false,
     val settingsLoaded: Boolean = false,
     val settingsSaving: Boolean = false,
     val settingsError: String? = null,
@@ -38,7 +39,7 @@ data class AppUiState(
 )
 
 sealed interface AppIntent {
-    data class SaveSettings(val tuning: PhysicsTuning, val useForMatches: Boolean) : AppIntent
+    data class SaveSettings(val tuning: PhysicsTuning, val useForMatches: Boolean, val threeActionTurns: Boolean = false) : AppIntent
     data object RetrySettings : AppIntent
     data object RetryProfile : AppIntent
     data object EditClub : AppIntent
